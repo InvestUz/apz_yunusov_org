@@ -49,8 +49,8 @@
                     <div class="d-flex align-items-start justify-content-between">
                         <div class="flex-grow-1">
                             <div class="card-title">Шартнома суммаси</div>
-                            <div class="card-value text-blue">{{ number_format($contract->contract_amount / 1000000000, 2) }}</div>
-                            <div class="card-subtitle mt-2">млрд сўм</div>
+                            <div class="card-value text-blue">{{ number_format($contract->contract_amount / 100000, 2) }}</div>
+                            <div class="card-subtitle mt-2">сўм</div>
                         </div>
                         <div class="icon-container">
                             <i class="fas fa-file-invoice-dollar"></i>
@@ -65,8 +65,8 @@
                     <div class="d-flex align-items-start justify-content-between">
                         <div class="flex-grow-1">
                             <div class="card-title">Тўланган</div>
-                            <div class="card-value text-blue">{{ number_format($totalPaid / 1000000000, 2) }}</div>
-                            <div class="card-subtitle mt-2">млрд сўм</div>
+                            <div class="card-value text-blue">{{ number_format($totalPaid / 100000, 2) }}</div>
+                            <div class="card-subtitle mt-2">сўм</div>
                         </div>
                         <div class="icon-container">
                             <i class="fas fa-money-bill-wave"></i>
@@ -81,8 +81,8 @@
                     <div class="d-flex align-items-start justify-content-between">
                         <div class="flex-grow-1">
                             <div class="card-title">Қарз</div>
-                            <div class="card-value text-red">{{ number_format($debt / 1000000000, 2) }}</div>
-                            <div class="card-subtitle mt-2">млрд сўм</div>
+                            <div class="card-value text-red">{{ number_format($debt / 100000, 2) }}</div>
+                            <div class="card-subtitle mt-2">сўм</div>
                         </div>
                         <div class="icon-container">
                             <i class="fas fa-times-circle"></i>
@@ -120,7 +120,7 @@
                         </tr>
                         <tr>
                             <th class="text-muted">Шартнома суммаси:</th>
-                            <td class="text-blue fw-bold fs-5">{{ number_format($contract->contract_amount / 1000000000, 2) }} млрд сўм</td>
+                            <td class="text-blue fw-bold fs-5">{{ number_format($contract->contract_amount / 100000, 2) }} сўм</td>
                         </tr>
                     </table>
                 </div>
@@ -141,11 +141,11 @@
                     <table class="table table-borderless mb-0">
                         <tr>
                             <th class="text-muted" style="width: 40%;">Тўланган:</th>
-                            <td class="text-blue fw-bold">{{ number_format($totalPaid / 1000000000, 2) }} млрд сўм</td>
+                            <td class="text-blue fw-bold">{{ number_format($totalPaid / 100000, 2) }} сўм</td>
                         </tr>
                         <tr>
                             <th class="text-muted">Қарз:</th>
-                            <td class="text-red fw-bold">{{ number_format($debt / 1000000000, 2) }} млрд сўм</td>
+                            <td class="text-red fw-bold">{{ number_format($debt / 100000, 2) }} сўм</td>
                         </tr>
                         <tr>
                             <th class="text-muted">Тўлов фоизи:</th>
