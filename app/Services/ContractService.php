@@ -19,10 +19,13 @@ class ContractService
             if (count($row) < 10) continue;
 
             $contractNumber = trim($row[4] ?? '');
-            if (empty($contractNumber) || strpos($contractNumber, 'APT') === false) continue;
+            $companyName = trim($row[3] ?? '');
+
+            // Skip if no contract number or company name
+            if (empty($contractNumber) || empty($companyName)) continue;
 
             $contractAmount = $this->parseAmount($row[13] ?? '0');
-            if ($contractAmount == 0) continue;
+            $initialPayment = $this->parseAmount($row[14] ?? '0');
 
             // Parse quarterly payment data from columns 17-35
             $quarterlyPayments = [];
@@ -41,7 +44,7 @@ class ContractService
                 'contract_date' => $this->parseDate($row[7] ?? ''),
                 'completion_date' => $this->parseDate($row[8] ?? ''),
                 'contract_amount' => $contractAmount,
-                'initial_payment' => $this->parseAmount($row[14] ?? '0'),
+                'initial_payment' => $initialPayment,
                 'remaining_amount' => $this->parseAmount($row[15] ?? '0'),
                 'quarterly_payment' => $this->parseAmount($row[16] ?? '0'),
                 'payment_terms' => trim($row[9] ?? ''),

@@ -98,34 +98,59 @@ class ARTDataSeeder extends Seeder
 
     private function generateSchedulesForContract(Contract $contract, array $quarterlyPayments)
     {
-        // Map quarters: I Q1 2024, II Q2 2024, III Q3 2024, IV Q4 2024, etc.
-        // Array indices 0-15 for 2024-2027 (4 quarters x 4 years)
-        $years = [2024, 2025, 2026, 2027];
-        $index = 0;
+        // Check if this is a Muddatsiz (one-time payment) contract
+        // Muddatsiz contracts have no quarterly payments (all zeros)
+        $hasQuarterlyPayments = array_sum($quarterlyPayments) > 0;
 
-        foreach ($years as $year) {
-            for ($quarter = 1; $quarter <= 4; $quarter++) {
-                $amount = $quarterlyPayments[$index] ?? 0;
-                $index++;
+        if (!$hasQuarterlyPayments) {
+            // Muddatsiz: One-time payment contract
+            // Create a single schedule entry for the initial/remaining payment
+            $plannedAmount = $contract->remaining_amount > 0 ? $contract->remaining_amount : $contract->initial_payment;
 
-                // Skip if amount is zero or null
-                if ($amount <= 0) continue;
-
-                // Calculate due date (last day of quarter)
-                $month = $quarter * 3;
-                $dueDate = Carbon::create($year, $month, 1)->endOfMonth();
-
+            if ($plannedAmount > 0) {
                 PaymentSchedule::create([
                     'contract_id' => $contract->id,
-                    'year' => $year,
-                    'quarter' => $quarter,
-                    'period' => "{$year} Q{$quarter}",
-                    'planned_amount' => $amount,
+                    'year' => $contract->completion_date ? $contract->completion_date->year : Carbon::now()->year,
+                    'quarter' => $contract->completion_date ? (int)ceil($contract->completion_date->month / 3) : 1,
+                    'period' => 'Muddatsiz', // One-time payment
+                    'planned_amount' => $plannedAmount,
                     'actual_amount' => 0,
-                    'debt_amount' => $amount,
-                    'due_date' => $dueDate,
+                    'debt_amount' => $plannedAmount,
+                    'due_date' => $contract->completion_date ?? Carbon::now(),
                     'is_overdue' => false,
                 ]);
+            }
+        } else {
+            // Muddatli: Scheduled payment contract
+            // Map quarters: I Q1 2024, II Q2 2024, III Q3 2024, IV Q4 2024, etc.
+            // Array indices 0-15 for 2024-2027 (4 quarters x 4 years)
+            $years = [2024, 2025, 2026, 2027];
+            $index = 0;
+
+            foreach ($years as $year) {
+                for ($quarter = 1; $quarter <= 4; $quarter++) {
+                    $amount = $quarterlyPayments[$index] ?? 0;
+                    $index++;
+
+                    // Skip if amount is zero or null
+                    if ($amount <= 0) continue;
+
+                    // Calculate due date (last day of quarter)
+                    $month = $quarter * 3;
+                    $dueDate = Carbon::create($year, $month, 1)->endOfMonth();
+
+                    PaymentSchedule::create([
+                        'contract_id' => $contract->id,
+                        'year' => $year,
+                        'quarter' => $quarter,
+                        'period' => "{$year} Q{$quarter}",
+                        'planned_amount' => $amount,
+                        'actual_amount' => 0,
+                        'debt_amount' => $amount,
+                        'due_date' => $dueDate,
+                        'is_overdue' => false,
+                    ]);
+                }
             }
         }
     }
