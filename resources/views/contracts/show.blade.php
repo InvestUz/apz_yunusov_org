@@ -49,7 +49,7 @@
                     <div class="d-flex align-items-start justify-content-between">
                         <div class="flex-grow-1">
                             <div class="card-title">Шартнома суммаси</div>
-                            <div class="card-value text-blue">{{ number_format($contract->contract_amount / 100000, 2) }}</div>
+                            <div class="card-value text-blue">{{ number_format($contract->contract_amount , 2) }}</div>
                             <div class="card-subtitle mt-2">сўм</div>
                         </div>
                         <div class="icon-container">
@@ -65,7 +65,7 @@
                     <div class="d-flex align-items-start justify-content-between">
                         <div class="flex-grow-1">
                             <div class="card-title">Тўланган</div>
-                            <div class="card-value text-blue">{{ number_format($totalPaid / 100000, 2) }}</div>
+                            <div class="card-value text-blue">{{ number_format($totalPaid , 2) }}</div>
                             <div class="card-subtitle mt-2">сўм</div>
                         </div>
                         <div class="icon-container">
@@ -81,7 +81,7 @@
                     <div class="d-flex align-items-start justify-content-between">
                         <div class="flex-grow-1">
                             <div class="card-title">Қарз</div>
-                            <div class="card-value text-red">{{ number_format($debt / 100000, 2) }}</div>
+                            <div class="card-value text-red">{{ number_format($debt, 2) }}</div>
                             <div class="card-subtitle mt-2">сўм</div>
                         </div>
                         <div class="icon-container">
@@ -120,7 +120,7 @@
                         </tr>
                         <tr>
                             <th class="text-muted">Шартнома суммаси:</th>
-                            <td class="text-blue fw-bold fs-5">{{ number_format($contract->contract_amount / 100000, 2) }} сўм</td>
+                            <td class="text-blue fw-bold fs-5">{{ number_format($contract->contract_amount, 2) }} сўм</td>
                         </tr>
                     </table>
                 </div>
@@ -141,11 +141,11 @@
                     <table class="table table-borderless mb-0">
                         <tr>
                             <th class="text-muted" style="width: 40%;">Тўланган:</th>
-                            <td class="text-blue fw-bold">{{ number_format($totalPaid / 100000, 2) }} сўм</td>
+                            <td class="text-blue fw-bold">{{ number_format($totalPaid , 2) }} сўм</td>
                         </tr>
                         <tr>
                             <th class="text-muted">Қарз:</th>
-                            <td class="text-red fw-bold">{{ number_format($debt / 100000, 2) }} сўм</td>
+                            <td class="text-red fw-bold">{{ number_format($debt , 2) }} сўм</td>
                         </tr>
                         <tr>
                             <th class="text-muted">Тўлов фоизи:</th>
@@ -196,7 +196,7 @@
                                 <tr>
                                     <td>{{ $loop->iteration }}</td>
                                     <td>{{ \Carbon\Carbon::parse($payment->payment_date)->format('d.m.Y') }}</td>
-                                    <td class="text-blue fw-bold">{{ number_format($payment->amount_debit / 100, 0, '.', ' ') }} сўм</td>
+                                    <td class="text-blue fw-bold">{{ number_format($payment->amount_debit , 0, '.', ' ') }} сўм</td>
                                     <td>
                                         <small class="text-muted">
                                             Дебет: {{ number_format($payment->amount_debit, 0) }}<br>
@@ -239,7 +239,7 @@
                                 <tr>
                                     <td>{{ $loop->iteration }}</td>
                                     <td>{{ \Carbon\Carbon::parse($schedule->due_date)->format('d.m.Y') }}</td>
-                                    <td class="fw-bold">{{ number_format($schedule->planned_amount / 100, 0, '.', ' ') }} сўм</td>
+                                    <td class="fw-bold">{{ number_format($schedule->planned_amount , 0, '.', ' ') }} сўм</td>
                                     <td>{{ $schedule->period ?? '—' }}</td>
                                 </tr>
                                 @endforeach

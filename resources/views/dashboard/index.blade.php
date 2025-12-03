@@ -48,7 +48,7 @@
                     <div class="d-flex align-items-center justify-content-between">
                         <div class="flex-grow-1">
                             <div class="card-title">Тушадиган маблағ</div>
-                            <div class="card-value text-blue">{{ number_format($stats->totalPaid / 1000000000, 2) }}</div>
+                            <div class="card-value text-blue" title="{{ number_format($stats->totalPaid , 2) }}">{{ number_format($stats->totalPaid / 1000000000, 2) }}</div>
                             <div class="card-subtitle mt-3">млрд сўм</div>
                         </div>
                         <div class="icon-container">
@@ -66,7 +66,7 @@
                     <div class="d-flex align-items-center justify-content-between">
                         <div class="flex-grow-1">
                             <div class="card-title">Амалда тушган маблағ</div>
-                            <div class="card-value text-blue">{{ number_format($stats->activeAmount / 1000000000, 2) }}</div>
+                            <div class="card-value text-blue" title="{{ number_format($stats->activeAmount , 2) }}">{{ number_format($stats->activeAmount / 1000000000, 2) }}</div>
                             <div class="card-subtitle mt-3">млрд сўм</div>
                         </div>
                         <div class="icon-container">
@@ -84,7 +84,7 @@
                     <div class="d-flex align-items-center justify-content-between">
                         <div class="flex-grow-1">
                             <div class="card-title">Қолдиқ маблағ</div>
-                            <div class="card-value text-red">{{ number_format($stats->totalDebt / 1000000000, 2) }}</div>
+                            <div class="card-value text-red" title="{{ number_format($stats->totalDebt , 2) }}">{{ number_format($stats->totalDebt / 1000000000, 2) }}</div>
                             <div class="card-subtitle mt-3">млрд сўм</div>
                             @php
                                 $debtPercentage = $stats->totalAmount > 0 ? ($stats->totalDebt / $stats->totalAmount * 100) : 0;
@@ -111,7 +111,7 @@
                     <div class="d-flex align-items-center justify-content-between">
                         <div class="flex-grow-1">
                             <div class="card-title">Муддати ўтган қарздорлик</div>
-                            <div class="card-value text-red">{{ number_format(($stats->totalDebt * 0.54) / 1000000000, 2) }}</div>
+                            <div class="card-value text-red" title="{{ number_format(($stats->totalDebt * 0.54), 2) }}">{{ number_format(($stats->totalDebt * 0.54) / 1000000000, 2) }}</div>
                             <div class="card-subtitle mt-3">млрд сўм</div>
                         </div>
                         <div class="icon-container">
@@ -304,9 +304,9 @@
                                     <td>{{ $totalContracts }}</td>
                                     <td class="amount-billion">{{ number_format($totalAmount / 1000000000, 2) }}</td>
 
-                                    <!-- Бекор қилинган -->
-                                    <td>{{ $totalCancelled }}</td>
-                                    <td>{{ number_format($totalCancelledAmount / 1000000000, 2) }}</td>
+                                    <!-- Бекор қилинган (hidden) -->
+                                    <td style="display: none;">{{ $totalCancelled }}</td>
+                                    <td style="display: none;">{{ number_format($totalCancelledAmount / 1000000000, 2) }}</td>
 
                                     <!-- Тўлиқ тўланган -->
                                     <td>{{ $totalCompleted }}</td>

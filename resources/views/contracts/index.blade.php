@@ -81,7 +81,7 @@
                     <div class="d-flex align-items-start justify-content-between">
                         <div class="flex-grow-1">
                             <div class="card-title">Тўланган</div>
-                            <div class="card-value text-blue">{{ number_format($filterSummary['total_paid'] / 1000000000, 2) }}</div>
+                            <div class="card-value text-blue">{{ number_format($filterSummary['total_paid'], 2) }}</div>
                             <div class="card-subtitle mt-2">млрд сўм</div>
                         </div>
                         <div class="icon-container">
@@ -98,7 +98,7 @@
                     <div class="d-flex align-items-start justify-content-between">
                         <div class="flex-grow-1">
                             <div class="card-title">Жами сумма</div>
-                            <div class="card-value text-blue">{{ number_format($filterSummary['total_amount'] / 1000000000, 2) }}</div>
+                            <div class="card-value text-blue">{{ number_format($filterSummary['total_amount'], 2) }}</div>
                             <div class="card-subtitle mt-2">млрд сўм</div>
                         </div>
                         <div class="icon-container">
@@ -115,7 +115,7 @@
                     <div class="d-flex align-items-start justify-content-between">
                         <div class="flex-grow-1">
                             <div class="card-title">Қарз</div>
-                            <div class="card-value text-red">{{ number_format($filterSummary['total_debt'] / 1000000000, 2) }}</div>
+                            <div class="card-value text-red">{{ number_format($filterSummary['total_debt'], 2) }}</div>
                             <div class="card-subtitle mt-2">млрд сўм</div>
                         </div>
                         <div class="icon-container">

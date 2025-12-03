@@ -94,6 +94,7 @@ class ContractRepository
         return Contract::select('district')
             ->whereNotNull('district')
             ->whereRaw('TRIM(district) != ""')
+            ->whereIn('status', [$activeStatus, $completedStatus])
             ->selectRaw('COUNT(*) as contracts_count')
             ->selectRaw('SUM(contract_amount) as total_amount')
             ->selectRaw('SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) as active_count', [$activeStatus])
@@ -127,7 +128,12 @@ class ContractRepository
 
     public function getContractIdsByDistrict(string $district): Collection
     {
-        return Contract::where('district', $district)->pluck('id');
+        return Contract::where('district', $district)
+            ->whereIn('status', [
+                config('dashboard.statuses.active'),
+                config('dashboard.statuses.completed'),
+            ])
+            ->pluck('id');
     }
 
     public function getLegalEntitiesCount(): int
