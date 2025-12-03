@@ -22,7 +22,7 @@
     <!-- Summary Cards -->
     <div class="row g-4 mb-5">
         <!-- Card 1: Total Contracts - Blue -->
-        <div class="col-xl-20p col-lg-4 col-md-6">
+        <div class="col-xl-10p col-lg-4 col-md-6">
             <div class="stats-card card-blue">
                 <div class="card-body w-100">
                     <div class="d-flex align-items-center justify-content-between">
@@ -30,7 +30,7 @@
                             <div class="card-title">Жами лотлар сони</div>
                             <div class="card-value text-blue">{{ $stats->totalContracts }} <span style="font-size: 1.5rem; font-weight: 500;">ta</span></div>
                             <div class="card-subtitle mt-3">
-                                <strong class="text-blue" style="font-size: 1.2rem;">{{ number_format($stats->totalAmount / 1000000000, 2) }}</strong> млрд сўм
+                                <strong class="text-blue" style="font-size: 1.2rem;">{{ number_format($stats->totalAmount,0,'',' ') }}</strong> млрд сўм
                             </div>
                         </div>
                         <div class="icon-container">
@@ -42,17 +42,17 @@
         </div>
 
         <!-- Card 2: Total Paid - Blue -->
-        <div class="col-xl-20p col-lg-4 col-md-6">
+        <div class="col-xl-10p col-lg-4 col-md-6">
             <div class="stats-card card-blue">
                 <div class="card-body w-100">
                     <div class="d-flex align-items-center justify-content-between">
                         <div class="flex-grow-1">
                             <div class="card-title">Тушадиган маблағ</div>
-                            <div class="card-value text-blue" title="{{ number_format($stats->totalPaid , 2) }}">{{ number_format($stats->totalPaid / 1000000000, 2) }}</div>
-                            <div class="card-subtitle mt-3">млрд сўм</div>
+                            <div class="card-value text-blue" title="{{ number_format($stats->totalPaid ,0,'',' ') }}">{{ number_format($stats->totalPaid,0,'',' ') }}</div>
+                            <div class="card-subtitle mt-3">сўм</div>
                         </div>
                         <div class="icon-container">
-                            <i class="fas fa-dollar-sign"></i>
+                            <i class="fas fa-calculator"></i>
                         </div>
                     </div>
                 </div>
@@ -60,14 +60,14 @@
         </div>
 
         <!-- Card 3: Active Contracts - Blue -->
-        <div class="col-xl-20p col-lg-4 col-md-6">
+        <div class="col-xl-10p col-lg-4 col-md-6">
             <div class="stats-card card-blue">
                 <div class="card-body w-100">
                     <div class="d-flex align-items-center justify-content-between">
                         <div class="flex-grow-1">
                             <div class="card-title">Амалда тушган маблағ</div>
-                            <div class="card-value text-blue" title="{{ number_format($stats->activeAmount , 2) }}">{{ number_format($stats->activeAmount / 1000000000, 2) }}</div>
-                            <div class="card-subtitle mt-3">млрд сўм</div>
+                            <div class="card-value text-blue" title="{{ number_format($stats->activeAmount ,0,'',' ') }}">{{ number_format($stats->activeAmount,0,'',' ') }}</div>
+                            <div class="card-subtitle mt-3">сўм</div>
                         </div>
                         <div class="icon-container">
                             <i class="fas fa-calculator"></i>
@@ -78,14 +78,14 @@
         </div>
 
         <!-- Card 4: Total Debt - Red with Progress -->
-        <div class="col-xl-20p col-lg-4 col-md-6">
+        <div class="col-xl-10p col-lg-4 col-md-6">
             <div class="stats-card card-red">
                 <div class="card-body w-100">
                     <div class="d-flex align-items-center justify-content-between">
                         <div class="flex-grow-1">
                             <div class="card-title">Қолдиқ маблағ</div>
-                            <div class="card-value text-red" title="{{ number_format($stats->totalDebt , 2) }}">{{ number_format($stats->totalDebt / 1000000000, 2) }}</div>
-                            <div class="card-subtitle mt-3">млрд сўм</div>
+                            <div class="card-value text-red" title="{{ number_format($stats->totalDebt ,0,'',' ') }}">{{ number_format($stats->totalDebt,0,'',' ') }}</div>
+                            <div class="card-subtitle mt-3">сўм</div>
                             @php
                                 $debtPercentage = $stats->totalAmount > 0 ? ($stats->totalDebt / $stats->totalAmount * 100) : 0;
                             @endphp
@@ -105,14 +105,14 @@
         </div>
 
         <!-- Card 5: Overdue Debt - Red with Progress -->
-        <div class="col-xl-20p col-lg-4 col-md-6">
+        <div class="col-xl-10p col-lg-4 col-md-6">
             <div class="stats-card card-red">
                 <div class="card-body w-100">
                     <div class="d-flex align-items-center justify-content-between">
                         <div class="flex-grow-1">
                             <div class="card-title">Муддати ўтган қарздорлик</div>
-                            <div class="card-value text-red" title="{{ number_format(($stats->totalDebt * 0.54), 2) }}">{{ number_format(($stats->totalDebt * 0.54) / 1000000000, 2) }}</div>
-                            <div class="card-subtitle mt-3">млрд сўм</div>
+                            <div class="card-value text-red" title="{{ number_format(($stats->totalDebt * 0.54),0,'',' ') }}">{{ number_format(($stats->totalDebt * 0.54),0,'',' ') }}</div>
+                            <div class="card-subtitle mt-3">сўм</div>
                         </div>
                         <div class="icon-container">
                             <i class="fas fa-exclamation-triangle"></i>
