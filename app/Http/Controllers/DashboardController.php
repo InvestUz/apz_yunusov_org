@@ -20,7 +20,10 @@ class DashboardController extends Controller
         $stats = $this->dashboardService->getDashboardStats($period);
         $districtStats = $this->dashboardService->getDistrictStats();
         $chartData = $this->dashboardService->getChartData('month');
-        $statusDistribution = $this->dashboardService->getStatusDistribution();
+        $statusDistribution = array_values(array_filter(
+            $this->dashboardService->getStatusDistribution(),
+            fn($s) => in_array($s['code'], [config('dashboard.statuses.active'), config('dashboard.statuses.completed')])
+        ));
         $recentContracts = $this->dashboardService->getRecentContracts();
         $recentPayments = $this->dashboardService->getRecentPayments();
 

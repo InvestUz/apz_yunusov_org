@@ -42,9 +42,10 @@
                         <span class="badge bg-blue text-white">
                             <i class="fas fa-info-circle me-1"></i>
                             @switch($filterSummary['status'])
-                                @case('active') Амалдаги @break
-                                @case('cancelled') Бекор қилинган @break
-                                @case('completed') Тўлиқ тўланган @break
+                                @case('active') амал қилувчи @break
+                                @case('completed') якунланган @break
+                                @case('амал қилувчи') амал қилувчи @break
+                                @case('якунланган') якунланган @break
                             @endswitch
                         </span>
                         @endif
@@ -173,15 +174,11 @@
                                     <td>
                                         @if($contract->status === config('dashboard.statuses.active'))
                                             <span class="badge bg-blue text-white">
-                                                <i class="fas fa-check-circle me-1"></i>Амалдаги
+                                                <i class="fas fa-check-circle me-1"></i>амал қилувчи
                                             </span>
                                         @elseif($contract->status === config('dashboard.statuses.completed'))
                                             <span class="badge bg-blue text-white">
-                                                <i class="fas fa-check-double me-1"></i>Якунланган
-                                            </span>
-                                        @elseif($contract->status === config('dashboard.statuses.cancelled'))
-                                            <span class="badge bg-danger text-white">
-                                                <i class="fas fa-ban me-1"></i>Бекор қилинган
+                                                <i class="fas fa-check-double me-1"></i>якунланган
                                             </span>
                                         @else
                                             <span class="badge bg-secondary">{{ $contract->status }}</span>

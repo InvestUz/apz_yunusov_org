@@ -79,7 +79,10 @@ class Contract extends Model
 
     public function scopeCancelled($query)
     {
-        return $query->where('status', config('dashboard.statuses.cancelled'));
+        return $query->whereNotIn('status', [
+            config('dashboard.statuses.active'),
+            config('dashboard.statuses.completed'),
+        ]);
     }
 
     public function scopeCompleted($query)

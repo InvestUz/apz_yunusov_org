@@ -6,96 +6,230 @@ use App\Models\Contract;
 use App\Models\Payment;
 use App\Models\PaymentSchedule;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Log;
+use Exception;
 
 class ContractService
 {
     public function parseContractCSV($filePath)
     {
-        $file = fopen($filePath, 'r');
-        $headers = fgetcsv($file, 0, ';');
-        $contracts = [];
-
-        while (($row = fgetcsv($file, 0, ';')) !== false) {
-            if (count($row) < 10) continue;
-
-            $contractNumber = trim($row[4] ?? '');
-            $companyName = trim($row[3] ?? '');
-
-            // Skip if no contract number or company name
-            if (empty($contractNumber) || empty($companyName)) continue;
-
-            $contractAmount = $this->parseAmount($row[13] ?? '0');
-            $initialPayment = $this->parseAmount($row[14] ?? '0');
-
-            // Parse quarterly payment data from columns 17-35
-            $quarterlyPayments = [];
-            for ($i = 17; $i <= 35 && $i < count($row); $i++) {
-                $quarterlyPayments[] = $this->parseAmount($row[$i] ?? '0');
-            }
-
-            $contracts[] = [
-                'contract_number' => $contractNumber,
-                'inn' => $this->cleanIdentifier($row[1] ?? ''),
-                'pinfl' => $this->cleanIdentifier($row[1] ?? ''),
-                'passport' => trim($row[2] ?? ''),
-                'company_name' => trim($row[3] ?? 'N/A'),
-                'district' => trim($row[12] ?? 'Unknown'),
-                'status' => $this->parseStatus($row[6] ?? ''),
-                'contract_date' => $this->parseDate($row[7] ?? ''),
-                'completion_date' => $this->parseDate($row[8] ?? ''),
-                'contract_amount' => $contractAmount,
-                'initial_payment' => $initialPayment,
-                'remaining_amount' => $this->parseAmount($row[15] ?? '0'),
-                'quarterly_payment' => $this->parseAmount($row[16] ?? '0'),
-                'payment_terms' => trim($row[9] ?? ''),
-                'payment_period' => (int)($row[10] ?? 0),
-                'advance_percent' => $this->parsePercent($row[11] ?? '0'),
-                'quarterly_payments' => $quarterlyPayments, // Store quarterly payments data
-            ];
+        if (!file_exists($filePath)) {
+            throw new Exception("Contract CSV file not found: {$filePath}");
         }
 
-        fclose($file);
-        return $contracts;
+        if (!is_readable($filePath)) {
+            throw new Exception("Contract CSV file is not readable: {$filePath}");
+        }
+
+        $file = fopen($filePath, 'r');
+
+        if ($file === false) {
+            throw new Exception("Failed to open contract CSV file: {$filePath}");
+        }
+
+        try {
+            // Read and validate headers
+            $headers = fgetcsv($file, 0, ';');
+            if ($headers === false || count($headers) < 17) {
+                throw new Exception("Invalid CSV header format in contracts file");
+            }
+
+            $contracts = [];
+            $lineNumber = 1; // Start from 1 (header is line 1)
+
+            while (($row = fgetcsv($file, 0, ';')) !== false) {
+                $lineNumber++;
+
+                try {
+                    // Skip rows with insufficient data
+                    if (count($row) < 10) {
+                        Log::warning("Contract CSV line {$lineNumber}: Insufficient columns, skipping");
+                        continue;
+                    }
+
+                    $contractNumber = trim($row[4] ?? '');
+                    $companyName = trim($row[3] ?? '');
+
+                    // Skip if no contract number or company name
+                    if (empty($contractNumber)) {
+                        Log::warning("Contract CSV line {$lineNumber}: Missing contract number, skipping");
+                        continue;
+                    }
+
+                    if (empty($companyName)) {
+                        Log::warning("Contract CSV line {$lineNumber}: Missing company name, skipping");
+                        continue;
+                    }
+
+                    $contractAmount = $this->parseAmount($row[13] ?? '0');
+                    $initialPayment = $this->parseAmount($row[14] ?? '0');
+
+                    // Validate amounts
+                    if ($contractAmount < 0) {
+                        Log::warning("Contract CSV line {$lineNumber}: Negative contract amount, setting to 0");
+                        $contractAmount = 0;
+                    }
+
+                    if ($initialPayment < 0) {
+                        Log::warning("Contract CSV line {$lineNumber}: Negative initial payment, setting to 0");
+                        $initialPayment = 0;
+                    }
+
+                    // Parse quarterly payment data from columns 17 onwards
+                    // Extended to support up to column 47 (2024-2030, 7 years * 4 quarters = 28 columns)
+                    $quarterlyPayments = [];
+                    for ($i = 17; $i <= 47 && $i < count($row); $i++) {
+                        $quarterlyPayments[] = $this->parseAmount($row[$i] ?? '0');
+                    }
+
+                    $contracts[] = [
+                        'contract_number' => $contractNumber,
+                        'inn' => $this->cleanIdentifier($row[1] ?? ''),
+                        'pinfl' => $this->cleanIdentifier($row[1] ?? ''),
+                        'passport' => trim($row[2] ?? ''),
+                        'company_name' => $companyName,
+                        'district' => trim($row[12] ?? 'Unknown'),
+                        'status' => $this->parseStatus($row[6] ?? ''),
+                        'contract_date' => $this->parseDate($row[7] ?? ''),
+                        'completion_date' => $this->parseDate($row[8] ?? ''),
+                        'contract_amount' => $contractAmount,
+                        'initial_payment' => $initialPayment,
+                        'remaining_amount' => max(0, $this->parseAmount($row[15] ?? '0')),
+                        'quarterly_payment' => max(0, $this->parseAmount($row[16] ?? '0')),
+                        'payment_terms' => trim($row[9] ?? ''),
+                        'payment_period' => max(0, (int)($row[10] ?? 0)),
+                        'advance_percent' => $this->parsePercent($row[11] ?? '0'),
+                        'quarterly_payments' => $quarterlyPayments, // Store quarterly payments data
+                    ];
+
+                } catch (Exception $e) {
+                    Log::error("Contract CSV line {$lineNumber} error: " . $e->getMessage());
+                    continue; // Skip this row and continue with next
+                }
+            }
+
+            fclose($file);
+
+            if (empty($contracts)) {
+                throw new Exception("No valid contracts found in CSV file");
+            }
+
+            return $contracts;
+
+        } catch (Exception $e) {
+            fclose($file);
+            throw $e;
+        }
     }
 
     public function parsePaymentCSV($filePath)
     {
-        $file = fopen($filePath, 'r');
-        $headers = fgetcsv($file, 0, ';');
-        $payments = [];
-
-        while (($row = fgetcsv($file, 0, ';')) !== false) {
-            if (count($row) < 5) continue;
-
-            $paymentDate = $this->parseDate($row[0] ?? '');
-            if (!$paymentDate) continue;
-
-            $amount = $this->parseAmount($row[2] ?? '0');
-            if ($amount == 0) continue;
-
-            $payments[] = [
-                'payment_date' => $paymentDate,
-                'inn' => $this->cleanIdentifier($row[1] ?? ''),
-                'amount_debit' => $amount,
-                'amount_credit' => 0,
-                'description' => trim($row[3] ?? ''),
-                'district' => trim($row[6] ?? ''),
-                'payment_type' => trim($row[7] ?? ''),
-                'year' => (int)($row[8] ?? date('Y')),
-                'month' => trim($row[5] ?? ''),
-            ];
+        if (!file_exists($filePath)) {
+            throw new Exception("Payment CSV file not found: {$filePath}");
         }
 
-        fclose($file);
-        return $payments;
+        if (!is_readable($filePath)) {
+            throw new Exception("Payment CSV file is not readable: {$filePath}");
+        }
+
+        $file = fopen($filePath, 'r');
+
+        if ($file === false) {
+            throw new Exception("Failed to open payment CSV file: {$filePath}");
+        }
+
+        try {
+            // Read and validate headers
+            $headers = fgetcsv($file, 0, ';');
+            if ($headers === false) {
+                throw new Exception("Invalid CSV header format in payments file");
+            }
+
+            $payments = [];
+            $lineNumber = 1; // Start from 1 (header is line 1)
+
+            while (($row = fgetcsv($file, 0, ';')) !== false) {
+                $lineNumber++;
+
+                try {
+                    // Skip rows with insufficient data
+                    if (count($row) < 3) {
+                        Log::warning("Payment CSV line {$lineNumber}: Insufficient columns, skipping");
+                        continue;
+                    }
+
+                    $paymentDate = $this->parseDate($row[0] ?? '');
+                    if (!$paymentDate) {
+                        Log::warning("Payment CSV line {$lineNumber}: Invalid payment date, skipping");
+                        continue;
+                    }
+
+                    $amount = $this->parseAmount($row[2] ?? '0');
+                    if ($amount <= 0) {
+                        Log::warning("Payment CSV line {$lineNumber}: Zero or negative amount, skipping");
+                        continue;
+                    }
+
+                    $inn = $this->cleanIdentifier($row[1] ?? '');
+
+                    $payments[] = [
+                        'payment_date' => $paymentDate,
+                        'inn' => $inn,
+                        'amount_debit' => $amount,
+                        'amount_credit' => 0,
+                        'description' => trim($row[3] ?? ''),
+                        'district' => trim($row[6] ?? ''),
+                        'payment_type' => trim($row[7] ?? ''),
+                        'year' => isset($row[8]) && is_numeric($row[8]) ? (int)$row[8] : (int)date('Y'),
+                        'month' => trim($row[5] ?? ''),
+                        'is_matched' => false,
+                    ];
+
+                } catch (Exception $e) {
+                    Log::error("Payment CSV line {$lineNumber} error: " . $e->getMessage());
+                    continue; // Skip this row and continue with next
+                }
+            }
+
+            fclose($file);
+
+            if (empty($payments)) {
+                Log::warning("No valid payments found in CSV file");
+            }
+
+            return $payments;
+
+        } catch (Exception $e) {
+            fclose($file);
+            throw $e;
+        }
     }
 
     private function parseAmount($str)
     {
         $str = trim($str);
-        $str = str_replace([' ', ',', ' ', ' '], '', $str);
+
+        // Handle empty or dash-only values
+        if (empty($str) || in_array($str, ['-', '–', '—', 'N/A', 'n/a'])) {
+            return 0;
+        }
+
+        // Remove spaces (regular space, non-breaking space, thin space)
+        $str = str_replace([' ', ',', ' ', ' ', '\xC2\xA0'], '', $str);
+
+        // Handle dash characters
         $str = str_replace(['-', '–', '—'], '0', $str);
-        return (float)$str;
+
+        // Remove any remaining non-numeric characters except decimal point
+        $str = preg_replace('/[^0-9.]/', '', $str);
+
+        try {
+            $value = (float)$str;
+            return $value >= 0 ? $value : 0; // Ensure non-negative
+        } catch (Exception $e) {
+            Log::warning("Failed to parse amount: {$str}");
+            return 0;
+        }
     }
 
     private function parseDate($str)
@@ -121,9 +255,15 @@ class ContractService
     private function parseStatus($str)
     {
         $str = trim($str);
-        if (strpos($str, 'Амал') !== false) return 'Амал қилувчи';
-        if (strpos($str, 'Бекор') !== false) return 'Бекор қилинган';
-        if (strpos($str, 'Якун') !== false) return 'Якунланган';
+
+        // Convert to lowercase for case-insensitive matching
+        $strLower = mb_strtolower($str);
+
+        if (strpos($strLower, 'амал') !== false) return 'Амал қилувчи';
+        if (strpos($strLower, 'бекор') !== false) return 'Бекор қилинган';
+        if (strpos($strLower, 'якун') !== false) return 'Якунланган';
+
+        // Default to active status
         return 'Амал қилувчи';
     }
 
@@ -135,8 +275,16 @@ class ContractService
     private function cleanIdentifier($str)
     {
         $str = trim($str);
+
+        // Remove all non-numeric characters
         $str = preg_replace('/[^0-9]/', '', $str);
-        return !empty($str) ? $str : null;
+
+        // Return null if empty or if it's too short to be a valid identifier
+        if (empty($str)) {
+            return null;
+        }
+
+        return $str;
     }
 
     public function matchPaymentsToContracts()

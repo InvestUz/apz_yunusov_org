@@ -20,7 +20,9 @@ class ContractRepository
 
     public function getCancelled(): Collection
     {
-        return Contract::cancelled()->get();
+        return Contract::where('status', '!=', config('dashboard.statuses.active'))
+            ->where('status', '!=', config('dashboard.statuses.completed'))
+            ->get();
     }
 
     public function getCompleted(): Collection
@@ -28,10 +30,22 @@ class ContractRepository
         return Contract::completed()->get();
     }
 
-    public function getTotalCount(): int
+    public function getTotalCountForCoreStatuses(): int
     {
-        return Contract::count();
+        return Contract::whereIn('status', [
+            config('dashboard.statuses.active'),
+            config('dashboard.statuses.completed'),
+        ])->count();
     }
+
+    public function getTotalAmountForCoreStatuses(): float
+    {
+        return (float) Contract::whereIn('status', [
+            config('dashboard.statuses.active'),
+            config('dashboard.statuses.completed'),
+        ])->sum('contract_amount');
+    }
+
 
     public function getActiveCount(): int
     {
@@ -40,7 +54,9 @@ class ContractRepository
 
     public function getCancelledCount(): int
     {
-        return Contract::cancelled()->count();
+        return Contract::where('status', '!=', config('dashboard.statuses.active'))
+            ->where('status', '!=', config('dashboard.statuses.completed'))
+            ->count();
     }
 
     public function getCompletedCount(): int
@@ -60,7 +76,9 @@ class ContractRepository
 
     public function getCancelledAmount(): float
     {
-        return (float) Contract::cancelled()->sum('contract_amount');
+        return (float) Contract::where('status', '!=', config('dashboard.statuses.active'))
+            ->where('status', '!=', config('dashboard.statuses.completed'))
+            ->sum('contract_amount');
     }
 
     public function getCompletedAmount(): float
@@ -71,7 +89,6 @@ class ContractRepository
     public function getByDistrict(): Collection
     {
         $activeStatus = config('dashboard.statuses.active');
-        $cancelledStatus = config('dashboard.statuses.cancelled');
         $completedStatus = config('dashboard.statuses.completed');
 
         return Contract::select('district')
@@ -81,8 +98,8 @@ class ContractRepository
             ->selectRaw('SUM(contract_amount) as total_amount')
             ->selectRaw('SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) as active_count', [$activeStatus])
             ->selectRaw('SUM(CASE WHEN status = ? THEN contract_amount ELSE 0 END) as active_amount', [$activeStatus])
-            ->selectRaw('SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) as cancelled_count', [$cancelledStatus])
-            ->selectRaw('SUM(CASE WHEN status = ? THEN contract_amount ELSE 0 END) as cancelled_amount', [$cancelledStatus])
+            ->selectRaw('SUM(CASE WHEN status NOT IN (?, ?) THEN 1 ELSE 0 END) as cancelled_count', [$activeStatus, $completedStatus])
+            ->selectRaw('SUM(CASE WHEN status NOT IN (?, ?) THEN contract_amount ELSE 0 END) as cancelled_amount', [$activeStatus, $completedStatus])
             ->selectRaw('SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) as completed_count', [$completedStatus])
             ->selectRaw('SUM(CASE WHEN status = ? THEN contract_amount ELSE 0 END) as completed_amount', [$completedStatus])
             ->groupBy('district')
@@ -141,7 +158,9 @@ class ContractRepository
 
     public function getNonCancelledTotalAmount(): float
     {
-        return (float) Contract::where('status', '!=', config('dashboard.statuses.cancelled'))
-            ->sum('contract_amount');
+        return (float) Contract::whereIn('status', [
+                config('dashboard.statuses.active'),
+                config('dashboard.statuses.completed'),
+            ])->sum('contract_amount');
     }
 }

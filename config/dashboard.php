@@ -11,9 +11,9 @@ return [
     |
     */
     'statuses' => [
-        'active' => 'Амал қилувчи',
+        'active' => 'амал қилувчи',
         'cancelled' => 'Бекор қилинган',
-        'completed' => 'Якунланган',
+        'completed' => 'якунланган',
     ],
 
     /*
@@ -26,7 +26,7 @@ return [
     */
     'status_config' => [
         'active' => [
-            'label_uz' => 'Амал қилувчи',
+            'label_uz' => 'амал қилувчи',
             'label_en' => 'Active',
             'code' => 'ACTIVE',
             'color' => '#28a745',
@@ -38,7 +38,7 @@ return [
             'color' => '#dc3545',
         ],
         'completed' => [
-            'label_uz' => 'Якунланган',
+            'label_uz' => 'якунланган',
             'label_en' => 'Completed',
             'code' => 'COMPLETED',
             'color' => '#007bff',

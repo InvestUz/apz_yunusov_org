@@ -4,6 +4,25 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ContractController;
 
+use App\Models\Contract;
+use Illuminate\Support\Facades\Log;
+
+Route::get('/debug-core-status-contracts', function () {
+    $active = config('dashboard.statuses.active');       // амал қилувчи
+    $completed = config('dashboard.statuses.completed'); // якунланган
+
+    $contracts = Contract::whereIn('status', [$active, $completed])->get();
+
+    Log::info('Core status contracts summary', [
+        'active_label'    => $active,
+        'completed_label' => $completed,
+        'total'           => $contracts->count(),
+        'by_status'       => $contracts->groupBy('status')->map->count(),
+        'total_amount'    => (float) $contracts->sum('contract_amount'),
+    ]);
+
+    return 'Logged. Check storage/logs/laravel.log';
+});
 /*
 |--------------------------------------------------------------------------
 | Web Routes

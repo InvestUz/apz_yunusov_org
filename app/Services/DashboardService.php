@@ -26,12 +26,12 @@ class DashboardService
         $totalDebt = $this->calculateTotalDebt();
 
         return new DashboardStatsDTO(
-            totalContracts: $this->contractRepository->getTotalCount(),
-            totalAmount: $this->contractRepository->getTotalAmount(),
+            totalContracts: $this->contractRepository->getTotalCountForCoreStatuses(),
+            totalAmount: $this->contractRepository->getTotalAmountForCoreStatuses(),
             activeContracts: $this->contractRepository->getActiveCount(),
             activeAmount: $this->contractRepository->getActiveAmount(),
-            cancelledContracts: $this->contractRepository->getCancelledCount(),
-            cancelledAmount: $this->contractRepository->getCancelledAmount(),
+            cancelledContracts: 0,
+            cancelledAmount: 0,
             completedContracts: $this->contractRepository->getCompletedCount(),
             completedAmount: $this->contractRepository->getCompletedAmount(),
             legalEntities: $this->contractRepository->getLegalEntitiesCount(),
@@ -169,12 +169,6 @@ class DashboardService
                 'count' => $this->contractRepository->getActiveCount(),
             ],
             [
-                'name_uz' => $statuses['cancelled']['label_uz'],
-                'code' => $statuses['cancelled']['code'],
-                'color' => $statuses['cancelled']['color'],
-                'count' => $this->contractRepository->getCancelledCount(),
-            ],
-            [
                 'name_uz' => $statuses['completed']['label_uz'],
                 'code' => $statuses['completed']['code'],
                 'color' => $statuses['completed']['color'],
@@ -185,7 +179,7 @@ class DashboardService
 
     private function calculateTotalDebt(): float
     {
-        $totalAmount = $this->contractRepository->getNonCancelledTotalAmount();
+        $totalAmount = $this->contractRepository->getTotalAmountForCoreStatuses();
         $totalPaid = $this->paymentRepository->getNonCancelledTotalPaid();
 
         return max(0, $totalAmount - $totalPaid);

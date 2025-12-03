@@ -168,7 +168,7 @@
                                     <th rowspan="2" class="align-middle">Т/р</th>
                                     <th rowspan="2" class="align-middle">Ҳудуд</th>
                                     <th colspan="2">Жами АРТ шартномалар</th>
-                                    <th colspan="2">Бекор қилинган</th>
+                                    <th colspan="2" style="display: none;">Бекор қилинган</th>
                                     <th colspan="2">Тўлиқ тўланган</th>
                                     <th colspan="2">Амалдаги шартномалар</th>
                                     <th colspan="3">2025 III чорак</th>
@@ -179,8 +179,8 @@
                                 <tr>
                                     <th>сони</th>
                                     <th>млрд сўм</th>
-                                    <th>сони</th>
-                                    <th>млрд</th>
+                                    <th style="display: none;">сони</th>
+                                    <th style="display: none;">млрд</th>
                                     <th>сони</th>
                                     <th>млрд</th>
                                     <th>сони</th>
@@ -211,9 +211,9 @@
                                     <td class="clickable" onclick="window.location.href='/contracts?district={{ urlencode($district->districtName) }}'">{{ $district->contractsCount }}</td>
                                     <td class="amount-billion clickable" onclick="window.location.href='/contracts?district={{ urlencode($district->districtName) }}'">{{ number_format($district->totalAmount / 1000000000, 2) }}</td>
 
-                                    <!-- Бекор қилинган -->
-                                    <td class="clickable" onclick="window.location.href='/contracts?district={{ urlencode($district->districtName) }}&status=cancelled'">{{ $district->cancelledCount }}</td>
-                                    <td class="clickable" onclick="window.location.href='/contracts?district={{ urlencode($district->districtName) }}&status=cancelled'">{{ number_format($district->cancelledAmount / 1000000000, 2) }}</td>
+                                    <!-- Бекор қилинган (other statuses, hidden) -->
+                                    <td class="clickable" onclick="window.location.href='/contracts?district={{ urlencode($district->districtName) }}&status=cancelled'" style="display: none;">{{ $district->cancelledCount }}</td>
+                                    <td class="clickable" onclick="window.location.href='/contracts?district={{ urlencode($district->districtName) }}&status=cancelled'" style="display: none;">{{ number_format($district->cancelledAmount / 1000000000, 2) }}</td>
 
                                     <!-- Тўлиқ тўланған -->
                                     <td class="clickable" onclick="window.location.href='/contracts?district={{ urlencode($district->districtName) }}&status=completed'">{{ $district->completedCount }}</td>

@@ -21,9 +21,12 @@ class ContractController extends Controller
         // Filter by status
         if ($request->has('status')) {
             $statusMap = [
+                // English aliases
                 'active' => config('dashboard.statuses.active'),
-                'cancelled' => config('dashboard.statuses.cancelled'),
                 'completed' => config('dashboard.statuses.completed'),
+                // Uzbek aliases
+                'амал қилувчи' => config('dashboard.statuses.active'),
+                'якунланган' => config('dashboard.statuses.completed'),
             ];
 
             $status = $request->get('status');
