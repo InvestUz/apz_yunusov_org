@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Contract;
+use App\Models\Payment;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
@@ -62,6 +63,15 @@ class ContractController extends Controller
             }
         }
 
+        // Prepare summary query for totals
+        $summaryQuery = clone $query;
+
+        // Compute totals based on current filters
+        $totalAmount = (float) $summaryQuery->sum('contract_amount');
+        $contractIds = $summaryQuery->pluck('id');
+        $totalPaid = (float) Payment::whereIn('contract_id', $contractIds)->sum('amount_debit');
+        $totalDebt = max(0, $totalAmount - $totalPaid);
+
         // Get paginated results
         $contracts = $query->orderBy('created_at', 'desc')->paginate(20);
 
@@ -73,7 +83,9 @@ class ContractController extends Controller
             'year' => $request->get('year'),
             'type' => $request->get('type'),
             'total_count' => $contracts->total(),
-            'total_amount' => $query->sum('contract_amount'),
+            'total_amount' => $totalAmount,
+            'total_paid' => $totalPaid,
+            'total_debt' => $totalDebt,
         ];
 
         return view('contracts.index', compact('contracts', 'filterSummary'));

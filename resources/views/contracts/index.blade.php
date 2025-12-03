@@ -80,11 +80,12 @@
                 <div class="card-body p-4">
                     <div class="d-flex align-items-start justify-content-between">
                         <div class="flex-grow-1">
-                            <div class="card-title">Топилган шартномалар</div>
-                            <div class="card-value text-blue">{{ $filterSummary['total_count'] }} <span style="font-size: 1rem;">ta</span></div>
+                            <div class="card-title">Тўланган</div>
+                            <div class="card-value text-blue">{{ number_format($filterSummary['total_paid'] / 1000000000, 2) }}</div>
+                            <div class="card-subtitle mt-2">млрд сўм</div>
                         </div>
                         <div class="icon-container">
-                            <i class="fas fa-file-contract"></i>
+                            <i class="fas fa-money-bill-wave"></i>
                         </div>
                     </div>
                 </div>
@@ -113,11 +114,12 @@
                 <div class="card-body p-4">
                     <div class="d-flex align-items-start justify-content-between">
                         <div class="flex-grow-1">
-                            <div class="card-title">Саҳифалар</div>
-                            <div class="card-value text-blue">{{ $contracts->currentPage() }} <span style="font-size: 1rem;">/ {{ $contracts->lastPage() }}</span></div>
+                            <div class="card-title">Қарз</div>
+                            <div class="card-value text-red">{{ number_format($filterSummary['total_debt'] / 1000000000, 2) }}</div>
+                            <div class="card-subtitle mt-2">млрд сўм</div>
                         </div>
                         <div class="icon-container">
-                            <i class="fas fa-file"></i>
+                            <i class="fas fa-times-circle"></i>
                         </div>
                     </div>
                 </div>
@@ -165,9 +167,9 @@
                                     <td>
                                         <i class="fas fa-map-marker-alt text-blue me-1"></i>{{ $contract->district }}
                                     </td>
-                                    <td class="text-end fw-bold">{{ number_format($contract->contract_amount / 1000000, 2) }} млн</td>
-                                    <td class="text-end text-blue fw-bold">{{ number_format($totalPaid / 1000000, 2) }} млн</td>
-                                    <td class="text-end text-red fw-bold">{{ number_format($debt / 1000000, 2) }} млн</td>
+                                    <td class="text-end fw-bold">{{ number_format($contract->contract_amount / 100, 0, '.', '') }} сўм</td>
+                                    <td class="text-end text-blue fw-bold">{{ number_format($totalPaid / 100, 0, '.', '') }} сўм</td>
+                                    <td class="text-end text-red fw-bold">{{ number_format($debt / 100, 0, '.', '') }} сўм</td>
                                     <td>
                                         @if($contract->status === config('dashboard.statuses.active'))
                                             <span class="badge bg-blue text-white">

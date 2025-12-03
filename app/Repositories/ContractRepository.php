@@ -75,6 +75,8 @@ class ContractRepository
         $completedStatus = config('dashboard.statuses.completed');
 
         return Contract::select('district')
+            ->whereNotNull('district')
+            ->whereRaw('TRIM(district) != ""')
             ->selectRaw('COUNT(*) as contracts_count')
             ->selectRaw('SUM(contract_amount) as total_amount')
             ->selectRaw('SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) as active_count', [$activeStatus])
