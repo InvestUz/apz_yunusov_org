@@ -32,9 +32,6 @@ class ARTDataSeeder extends Seeder
         $startTime = microtime(true);
 
         try {
-            // Use database transaction for data integrity
-            DB::beginTransaction();
-
             // Verify CSV file exists before proceeding
             $this->verifyCsvFiles();
 
@@ -77,9 +74,6 @@ class ARTDataSeeder extends Seeder
             $this->contractService->calculateDebtAndOverdue();
             $this->command->info('✓ Debts and overdue amounts calculated');
 
-            // Commit transaction
-            DB::commit();
-
             $endTime = microtime(true);
             $duration = round($endTime - $startTime, 2);
 
@@ -87,7 +81,6 @@ class ARTDataSeeder extends Seeder
             $this->displaySummary($contractCount, $paymentCount, $duration);
 
         } catch (Exception $e) {
-            DB::rollBack();
             $this->command->error('===========================================');
             $this->command->error('SEEDING FAILED!');
             $this->command->error('===========================================');

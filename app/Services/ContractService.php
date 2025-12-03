@@ -214,8 +214,12 @@ class ContractService
             return 0;
         }
 
+        // First, replace comma with dot for decimal separator (Russian format)
+        // Example: "1 500 000,00" -> "1 500 000.00"
+        $str = str_replace(',', '.', $str);
+
         // Remove spaces (regular space, non-breaking space, thin space)
-        $str = str_replace([' ', ',', ' ', ' ', '\xC2\xA0'], '', $str);
+        $str = str_replace([' ', ' ', ' ', '\xC2\xA0'], '', $str);
 
         // Handle dash characters
         $str = str_replace(['-', '–', '—'], '0', $str);
