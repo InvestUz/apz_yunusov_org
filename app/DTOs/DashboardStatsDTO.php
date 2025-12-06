@@ -18,7 +18,8 @@ class DashboardStatsDTO
         public readonly float $totalPaid,
         public readonly float $totalDebt,
         public readonly int $paidContractsCount,
-        public readonly int $debtorsCount
+        public readonly int $debtorsCount,
+        public readonly float $todayDebt = 0.0
     ) {}
 
     public function toArray(): array
@@ -38,6 +39,7 @@ class DashboardStatsDTO
             'total_debt' => $this->totalDebt,
             'paid_contracts_count' => $this->paidContractsCount,
             'debtors_count' => $this->debtorsCount,
+            'today_debt' => $this->todayDebt,
         ];
     }
 }

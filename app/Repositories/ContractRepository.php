@@ -144,10 +144,7 @@ class ContractRepository
     public function getIndividualsCount(): int
     {
         return Contract::whereNull('inn')
-            ->where(function ($query) {
-                $query->whereNotNull('pinfl')
-                    ->orWhereNotNull('passport');
-            })
+            ->whereNotNull('pinfl')
             ->count();
     }
 

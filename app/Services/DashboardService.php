@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\DTOs\DashboardStatsDTO;
 use App\DTOs\DistrictStatsDTO;
+use App\Models\PaymentSchedule;
 use App\Repositories\ContractRepository;
 use App\Repositories\PaymentRepository;
 use App\Repositories\PaymentScheduleRepository;
@@ -19,11 +20,13 @@ class DashboardService
 
     public function getDashboardStats(?string $period = null): DashboardStatsDTO
     {
+        // Use payment schedules for all calculations since payments table is not used
         $totalPaid = $period
-            ? $this->paymentRepository->getTotalPaidByPeriod($period)
-            : $this->paymentRepository->getTotalPaid();
+            ? $this->getTotalPaidByPeriodFromSchedules($period)
+            : $this->getTotalPaidFromSchedules();
 
         $totalDebt = $this->calculateTotalDebt();
+        $todayDebt = $this->calculateTodayDebt();
 
         return new DashboardStatsDTO(
             totalContracts: $this->contractRepository->getTotalCountForCoreStatuses(),
@@ -39,7 +42,8 @@ class DashboardService
             totalPaid: $totalPaid,
             totalDebt: $totalDebt,
             paidContractsCount: $this->getPaidContractsCount(),
-            debtorsCount: $this->getDebtorsCount()
+            debtorsCount: $this->getDebtorsCount(),
+            todayDebt: $todayDebt
         );
     }
 
@@ -67,11 +71,11 @@ class DashboardService
                 cancelledAmount: (float) $district->cancelled_amount,
                 completedCount: (int) $district->completed_count,
                 completedAmount: (float) $district->completed_amount,
-                paidToday: $this->paymentRepository->getPaymentsByDistrictAndPeriod($district->district, 'today'),
-                paidWeek: $this->paymentRepository->getPaymentsByDistrictAndPeriod($district->district, 'week'),
-                paidMonth: $this->paymentRepository->getPaymentsByDistrictAndPeriod($district->district, 'month'),
-                paidQuarter: $this->paymentRepository->getPaymentsByDistrictAndPeriod($district->district, 'quarter'),
-                paidAmount: $this->paymentRepository->getPaymentsByDistrictAndPeriod($district->district, 'all'),
+                paidToday: $this->getPaymentsByDistrictAndPeriodFromSchedules($district->district, 'today'),
+                paidWeek: $this->getPaymentsByDistrictAndPeriodFromSchedules($district->district, 'week'),
+                paidMonth: $this->getPaymentsByDistrictAndPeriodFromSchedules($district->district, 'month'),
+                paidQuarter: $this->getPaymentsByDistrictAndPeriodFromSchedules($district->district, 'quarter'),
+                paidAmount: $this->getPaymentsByDistrictAndPeriodFromSchedules($district->district, 'all'),
                 // Q3 2025
                 q3_2025_plan: (float) $q3_2025['planned'],
                 q3_2025_fact: (float) $q3_2025['actual'],
@@ -95,16 +99,19 @@ class DashboardService
     public function getScheduleByPeriod(): array
     {
         $schedules = $this->scheduleRepository->getGroupedByPeriod();
-        return $this->groupSchedulesByYear($schedules);
+        return $this->groupSchedulesByYearAndQuarter($schedules);
     }
 
-    private function groupSchedulesByYear($schedules)
+    private function groupSchedulesByYearAndQuarter($schedules)
     {
         $grouped = [];
 
         foreach ($schedules as $schedule) {
             $year = $schedule->year;
-            $quarter = $schedule->quarter;
+            $month = $schedule->month;
+
+            // Calculate quarter from month
+            $quarter = (int)ceil($month / 3);
 
             if (!isset($grouped[$year])) {
                 $grouped[$year] = [
@@ -116,13 +123,21 @@ class DashboardService
                 ];
             }
 
-            $grouped[$year]['quarters'][$quarter] = [
-                'quarter' => $quarter,
-                'period' => $schedule->period,
-                'planned' => (float)$schedule->planned,
-                'actual' => (float)$schedule->actual,
-                'debt' => (float)$schedule->debt,
-            ];
+            // Initialize quarter if not exists
+            if (!isset($grouped[$year]['quarters'][$quarter])) {
+                $grouped[$year]['quarters'][$quarter] = [
+                    'quarter' => $quarter,
+                    'period' => "{$year} Q{$quarter}",
+                    'planned' => 0,
+                    'actual' => 0,
+                    'debt' => 0,
+                ];
+            }
+
+            // Aggregate monthly data into quarters
+            $grouped[$year]['quarters'][$quarter]['planned'] += (float)$schedule->planned;
+            $grouped[$year]['quarters'][$quarter]['actual'] += (float)$schedule->actual;
+            $grouped[$year]['quarters'][$quarter]['debt'] += (float)$schedule->debt;
 
             $grouped[$year]['total_planned'] += (float)$schedule->planned;
             $grouped[$year]['total_actual'] += (float)$schedule->actual;
@@ -143,7 +158,65 @@ class DashboardService
 
     public function getChartData(string $period = 'month'): Collection
     {
-        return $this->paymentRepository->getChartDataByPeriod($period);
+        // Use payment schedules instead of payments table (which is empty)
+        // since we're working with APZ CSV data that has schedules, not actual payments
+
+        if ($period === 'quarter') {
+            return $this->getQuarterlyChartData();
+        } elseif ($period === 'year') {
+            return $this->getYearlyChartData();
+        }
+
+        // Default: monthly chart data (limited to last 12 months)
+        return $this->getMonthlyChartData();
+    }
+
+    private function getMonthlyChartData(): Collection
+    {
+        $schedules = PaymentSchedule::selectRaw('year, month')
+            ->selectRaw('SUM(actual_amount) as actual')
+            ->groupBy('year', 'month')
+            ->orderBy('year')
+            ->orderBy('month')
+            ->get()
+            ->map(function($item) {
+                $item->label = sprintf('%d-%02d', $item->year, $item->month);
+                return $item;
+            });
+
+        // Return only last 12 months to prevent chart overflow
+        return $schedules->slice(-12)->values();
+    }
+
+    private function getQuarterlyChartData(): Collection
+    {
+        $schedules = PaymentSchedule::selectRaw('year')
+            ->selectRaw('CEIL(month / 3) as quarter')
+            ->selectRaw('SUM(actual_amount) as actual')
+            ->groupBy('year', 'quarter')
+            ->orderBy('year')
+            ->orderByRaw('CEIL(month / 3)')
+            ->get()
+            ->map(function($item) {
+                $item->label = sprintf('%d Q%d', $item->year, $item->quarter);
+                return $item;
+            });
+
+        // Return only last 8 quarters (2 years)
+        return $schedules->slice(-8)->values();
+    }
+
+    private function getYearlyChartData(): Collection
+    {
+        return PaymentSchedule::selectRaw('year')
+            ->selectRaw('SUM(actual_amount) as actual')
+            ->groupBy('year')
+            ->orderBy('year')
+            ->get()
+            ->map(function($item) {
+                $item->label = (string)$item->year;
+                return $item;
+            });
     }
 
     public function getRecentContracts(int $limit = 5): Collection
@@ -154,7 +227,22 @@ class DashboardService
     }
 
     public function getRecentPayments(int $limit = 5): Collection
-    {        return $this->paymentRepository->getRecentPayments($limit);
+    {
+        // Get recent payment schedules with actual amounts instead of payments table
+        return PaymentSchedule::with('contract')
+            ->where('actual_amount', '>', 0)
+            ->orderBy('period_date', 'desc')
+            ->orderBy('updated_at', 'desc')
+            ->limit($limit)
+            ->get()
+            ->map(function($schedule) {
+                return (object)[
+                    'contract' => $schedule->contract,
+                    'amount' => $schedule->actual_amount,
+                    'payment_date' => $schedule->period_date,
+                    'period_label' => $schedule->period_label,
+                ];
+            });
     }
 
     public function getStatusDistribution(): array
@@ -179,10 +267,27 @@ class DashboardService
 
     private function calculateTotalDebt(): float
     {
-        $totalAmount = $this->contractRepository->getTotalAmountForCoreStatuses();
-        $totalPaid = $this->paymentRepository->getNonCancelledTotalPaid();
+        // Calculate from payment schedules: sum of all debt amounts
+        return PaymentSchedule::sum('debt_amount');
+    }
 
-        return max(0, $totalAmount - $totalPaid);
+    /**
+     * Calculate today's debt (текущая задолженность на сегодня)
+     * Formula: sum(planned up to today) - sum(actual)
+     */
+    private function calculateTodayDebt(): float
+    {
+        $today = now();
+
+        // Get sum of planned amounts for periods up to today
+        $plannedUpToToday = PaymentSchedule::whereDate('period_date', '<=', $today)
+            ->sum('planned_amount');
+
+        // Get sum of all actual payments
+        $totalActual = PaymentSchedule::sum('actual_amount');
+
+        // Today's debt = planned up to today - actual
+        return max(0, $plannedUpToToday - $totalActual);
     }
 
     private function calculateOverdueDebt(): float
@@ -192,16 +297,94 @@ class DashboardService
 
     private function getPaidContractsCount(): int
     {
-        return $this->contractRepository->getAll()
-            ->filter(fn($contract) => $contract->total_paid > 0)
-            ->count();
+        // Count contracts that have actual payments in schedules
+        return PaymentSchedule::where('actual_amount', '>', 0)
+            ->distinct('contract_id')
+            ->count('contract_id');
     }
 
     private function getDebtorsCount(): int
     {
-        return $this->contractRepository->getActive()
-            ->filter(fn($contract) => $contract->total_debt > 0)
-            ->count();
+        // Count contracts with positive debt
+        return PaymentSchedule::where('debt_amount', '>', 0)
+            ->distinct('contract_id')
+            ->count('contract_id');
+    }
+
+    /**
+     * Get total paid from payment schedules
+     */
+    private function getTotalPaidFromSchedules(): float
+    {
+        return PaymentSchedule::sum('actual_amount');
+    }
+
+    /**
+     * Get total paid by period from payment schedules
+     */
+    private function getTotalPaidByPeriodFromSchedules(string $period): float
+    {
+        $query = PaymentSchedule::query();
+
+        switch ($period) {
+            case 'today':
+                $query->whereDate('period_date', today());
+                break;
+            case 'week':
+                $query->whereBetween('period_date', [now()->startOfWeek(), now()->endOfWeek()]);
+                break;
+            case 'month':
+                $query->whereYear('period_date', now()->year)
+                      ->whereMonth('period_date', now()->month);
+                break;
+            case 'quarter':
+                $currentQuarter = (int)ceil(now()->month / 3);
+                $startMonth = ($currentQuarter - 1) * 3 + 1;
+                $endMonth = $currentQuarter * 3;
+                $query->whereYear('year', now()->year)
+                      ->whereBetween('month', [$startMonth, $endMonth]);
+                break;
+            case 'year':
+                $query->where('year', now()->year);
+                break;
+        }
+
+        return $query->sum('actual_amount');
+    }
+
+    /**
+     * Get payments by district and period from schedules
+     */
+    private function getPaymentsByDistrictAndPeriodFromSchedules(string $district, string $period): float
+    {
+        $contractIds = $this->contractRepository->getContractIdsByDistrict($district);
+        $query = PaymentSchedule::whereIn('contract_id', $contractIds);
+
+        switch ($period) {
+            case 'today':
+                $query->whereDate('period_date', today());
+                break;
+            case 'week':
+                $query->whereBetween('period_date', [now()->startOfWeek(), now()->endOfWeek()]);
+                break;
+            case 'month':
+                $query->whereYear('period_date', now()->year)
+                      ->whereMonth('period_date', now()->month);
+                break;
+            case 'quarter':
+                $currentQuarter = (int)ceil(now()->month / 3);
+                $startMonth = ($currentQuarter - 1) * 3 + 1;
+                $endMonth = $currentQuarter * 3;
+                $query->whereYear('year', now()->year)
+                      ->whereBetween('month', [$startMonth, $endMonth]);
+                break;
+            case 'all':
+            default:
+                // No date filter
+                break;
+        }
+
+        return $query->sum('actual_amount');
     }
 
     private function getDistrictSchedules(string $district): array
@@ -211,7 +394,9 @@ class DashboardService
 
         $periods = [];
         foreach ($schedules as $schedule) {
-            $periods[$schedule->period] = [
+            // Use period_label for monthly data
+            $periodKey = $schedule->period_label ?? $schedule->month;
+            $periods[$periodKey] = [
                 'planned' => (float) $schedule->planned / 1000000000,
                 'actual' => (float) $schedule->actual / 1000000000,
                 'debt' => (float) $schedule->debt / 1000000000,

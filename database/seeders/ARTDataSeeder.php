@@ -8,32 +8,28 @@ use Illuminate\Support\Facades\Log;
 use App\Models\Contract;
 use App\Models\Payment;
 use App\Models\PaymentSchedule;
-use App\Services\ContractService;
 use Carbon\Carbon;
 use Exception;
 
 class ARTDataSeeder extends Seeder
 {
-    protected $contractService;
     protected $errors = [];
     protected $warnings = [];
-
-    public function __construct()
-    {
-        $this->contractService = new ContractService();
-    }
 
     public function run(): void
     {
         $this->command->info('===========================================');
-        $this->command->info('Starting ART Production Data Seeding...');
+        $this->command->info('Starting APZ Data Seeding...');
         $this->command->info('===========================================');
 
         $startTime = microtime(true);
 
         try {
-            // Verify CSV file exists before proceeding
-            $this->verifyCsvFiles();
+            $csvPath = public_path('dataset/APZ chorak bo\'yicha (2).csv');
+
+            if (!file_exists($csvPath)) {
+                throw new Exception("CSV file not found at: {$csvPath}");
+            }
 
             // Disable foreign key checks
             DB::statement('SET FOREIGN_KEY_CHECKS=0;');
@@ -48,37 +44,14 @@ class ARTDataSeeder extends Seeder
             // Re-enable foreign key checks
             DB::statement('SET FOREIGN_KEY_CHECKS=1;');
 
-            // Seed Contracts
-            $contractCount = $this->seedContracts();
-
-            // Seed Payments (only if payment CSV exists)
-            $paymentCount = 0;
-            if (file_exists(public_path('dataset/fakt.csv'))) {
-                $paymentCount = $this->seedPayments();
-            } else {
-                $this->command->warn('Payment file (fakt.csv) not found - skipping payment seeding');
-            }
-
-            // Match Payments to Contracts
-            if ($paymentCount > 0) {
-                $this->command->info('Matching payments to contracts...');
-                $this->contractService->matchPaymentsToContracts();
-                $this->command->info('✓ Payments matched to contracts');
-            }
-
-            // Generate Payment Schedules
-            $this->command->info('Payment schedules already generated during contract seeding');
-
-            // Calculate Debts and Overdue
-            $this->command->info('Calculating debts and overdue amounts...');
-            $this->contractService->calculateDebtAndOverdue();
-            $this->command->info('✓ Debts and overdue amounts calculated');
+            // Parse and seed data
+            $contractCount = $this->seedFromCSV($csvPath);
 
             $endTime = microtime(true);
             $duration = round($endTime - $startTime, 2);
 
             // Display summary
-            $this->displaySummary($contractCount, $paymentCount, $duration);
+            $this->displaySummary($contractCount, $duration);
 
         } catch (Exception $e) {
             $this->command->error('===========================================');
@@ -87,7 +60,7 @@ class ARTDataSeeder extends Seeder
             $this->command->error('Error: ' . $e->getMessage());
             $this->command->error('File: ' . $e->getFile());
             $this->command->error('Line: ' . $e->getLine());
-            Log::error('ART Data Seeding Failed', [
+            Log::error('APZ Data Seeding Failed', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
             ]);
@@ -95,177 +68,310 @@ class ARTDataSeeder extends Seeder
         }
     }
 
-    private function verifyCsvFiles(): void
+    private function seedFromCSV(string $csvPath): int
     {
-        $contractCsv = public_path('dataset/contracts.csv');
+        $this->command->info('Reading CSV file...');
 
-        if (!file_exists($contractCsv)) {
-            throw new Exception("Contract CSV file not found at: {$contractCsv}");
+        $file = fopen($csvPath, 'r');
+        if ($file === false) {
+            throw new Exception("Failed to open CSV file: {$csvPath}");
         }
 
-        if (!is_readable($contractCsv)) {
-            throw new Exception("Contract CSV file is not readable: {$contractCsv}");
+        // Read header row
+        $headers = fgetcsv($file, 0, ';');
+        if ($headers === false) {
+            fclose($file);
+            throw new Exception('Failed to read CSV headers');
         }
 
-        $this->command->info('✓ CSV files verified');
-    }
+        // Parse header to get period dates
+        $factPeriods = [];
+        $planPeriods = [];
 
-    private function seedContracts(): int
-    {
-        $this->command->info('Seeding contracts from CSV...');
+        // Fact columns: 19-40 (indexes 18-39)
+        for ($i = 18; $i <= 39 && $i < count($headers); $i++) {
+            $factPeriods[] = trim($headers[$i]);
+        }
 
-        $csvPath = public_path('dataset/contracts.csv');
+        // Plan columns: 42-103 (indexes 41-102)
+        for ($i = 41; $i <= 102 && $i < count($headers); $i++) {
+            $planPeriods[] = trim($headers[$i]);
+        }
 
-        try {
-            $contracts = $this->contractService->parseContractCSV($csvPath);
-            $totalContracts = count($contracts);
-            $successCount = 0;
-            $errorCount = 0;
+        $contractCount = 0;
+        $lineNumber = 1;
 
-            $this->command->info("Found {$totalContracts} contracts to seed");
+        $this->command->info("Found " . count($factPeriods) . " fact periods and " . count($planPeriods) . " plan periods");
 
-            $progressBar = $this->command->getOutput()->createProgressBar($totalContracts);
-            $progressBar->start();
+        while (($row = fgetcsv($file, 0, ';')) !== false) {
+            $lineNumber++;
 
-            foreach ($contracts as $index => $contractData) {
-                try {
-                    // Validate contract data
-                    if (empty($contractData['contract_number'])) {
-                        $this->warnings[] = "Row " . ($index + 2) . ": Missing contract number - skipped";
-                        $errorCount++;
-                        $progressBar->advance();
-                        continue;
-                    }
-
-                    // Check for duplicate contract number
-                    $existingContract = Contract::where('contract_number', $contractData['contract_number'])->first();
-                    if ($existingContract) {
-                        $this->warnings[] = "Contract {$contractData['contract_number']} already exists - skipped";
-                        $errorCount++;
-                        $progressBar->advance();
-                        continue;
-                    }
-
-                    // Extract quarterly payments before creating contract
-                    $quarterlyPayments = $contractData['quarterly_payments'] ?? [];
-                    unset($contractData['quarterly_payments']);
-
-                    // Create contract
-                    $contract = Contract::create($contractData);
-
-                    // Generate payment schedules immediately with quarterly data
-                    $this->generateSchedulesForContract($contract, $quarterlyPayments);
-
-                    $successCount++;
-
-                } catch (Exception $e) {
-                    $errorCount++;
-                    $contractNum = $contractData['contract_number'] ?? 'Unknown';
-                    $this->errors[] = "Contract {$contractNum}: " . $e->getMessage();
-                    Log::error("Failed to seed contract {$contractNum}", ['error' => $e->getMessage()]);
+            try {
+                // Skip rows with insufficient data
+                if (count($row) < 20) {
+                    continue;
                 }
 
-                $progressBar->advance();
-            }
-
-            $progressBar->finish();
-            $this->command->newLine(2);
-
-            $this->command->info("✓ Contracts seeded: {$successCount} successful, {$errorCount} failed");
-
-            if ($errorCount > 0) {
-                $this->command->warn("⚠ {$errorCount} contracts failed to import");
-            }
-
-            return $successCount;
-
-        } catch (Exception $e) {
-            $this->command->error('Failed to parse contract CSV: ' . $e->getMessage());
-            throw $e;
-        }
-    }
-
-    private function seedPayments(): int
-    {
-        $this->command->info('Seeding payments from CSV...');
-
-        $csvPath = public_path('dataset/fakt.csv');
-
-        try {
-            $payments = $this->contractService->parsePaymentCSV($csvPath);
-            $totalPayments = count($payments);
-            $successCount = 0;
-            $errorCount = 0;
-
-            $this->command->info("Found {$totalPayments} payments to seed");
-
-            $progressBar = $this->command->getOutput()->createProgressBar($totalPayments);
-            $progressBar->start();
-
-            foreach ($payments as $index => $paymentData) {
-                try {
-                    // Validate payment data
-                    if (empty($paymentData['payment_date'])) {
-                        $this->warnings[] = "Payment row " . ($index + 2) . ": Missing payment date - skipped";
-                        $errorCount++;
-                        $progressBar->advance();
-                        continue;
-                    }
-
-                    if (($paymentData['amount_debit'] ?? 0) <= 0 && ($paymentData['amount_credit'] ?? 0) <= 0) {
-                        $this->warnings[] = "Payment row " . ($index + 2) . ": Zero amount - skipped";
-                        $errorCount++;
-                        $progressBar->advance();
-                        continue;
-                    }
-
-                    Payment::create($paymentData);
-                    $successCount++;
-
-                } catch (Exception $e) {
-                    $errorCount++;
-                    $this->errors[] = "Payment row " . ($index + 2) . ": " . $e->getMessage();
-                    Log::error("Failed to seed payment at row " . ($index + 2), ['error' => $e->getMessage()]);
+                // Skip empty rows
+                $contractNumber = trim($row[3] ?? '');
+                if (empty($contractNumber)) {
+                    continue;
                 }
 
-                $progressBar->advance();
+                $companyName = trim($row[2] ?? '');
+                if (empty($companyName)) {
+                    continue;
+                }
+
+                // Create contract
+                $contract = $this->createContract($row, $lineNumber);
+                if (!$contract) {
+                    continue;
+                }
+
+                // Create payment schedules from FACT columns (18-39)
+                $this->createPaymentSchedules($contract, $row, $factPeriods, $planPeriods, 18, 41);
+
+                $contractCount++;
+
+            } catch (Exception $e) {
+                $this->errors[] = "Line {$lineNumber}: " . $e->getMessage();
+                Log::error("Failed to seed line {$lineNumber}", ['error' => $e->getMessage()]);
             }
+        }
 
-            $progressBar->finish();
-            $this->command->newLine(2);
+        fclose($file);
 
-            $this->command->info("✓ Payments seeded: {$successCount} successful, {$errorCount} failed");
+        $this->command->info("\n✓ Processed {$contractCount} contracts");
+        return $contractCount;
+    }
 
-            if ($errorCount > 0) {
-                $this->command->warn("⚠ {$errorCount} payments failed to import");
-            }
+    private function createContract(array $row, int $lineNumber): ?Contract
+    {
+        try {
+            $inn = $this->cleanIdentifier($row[0] ?? '');
+            $pinfl = $this->cleanIdentifier($row[1] ?? '');
+            $companyName = trim($row[2] ?? '');
+            $contractNumber = trim($row[3] ?? '');
+            $additionalNumber = trim($row[4] ?? '0');
+            $status = $this->parseStatus($row[5] ?? '');
+            $contractDate = $this->parseDate($row[6] ?? '');
+            $completionDate = $this->parseDate($row[7] ?? '');
+            $paymentTerms = trim($row[8] ?? '');
+            $paymentPeriod = (int)($row[9] ?? 0);
+            $advancePercent = trim($row[10] ?? '');
+            $district = trim($row[11] ?? 'Unknown');
+            $contractAmount = $this->parseAmount($row[12] ?? '0');
+            $oneTimePayment = $this->parseAmount($row[13] ?? '0');
+            $monthlyPayment = $this->parseAmount($row[14] ?? '0');
+            $totalPayment = $this->parseAmount($row[15] ?? '0');
+            $remainingAmount = $this->parseAmount($row[16] ?? '0');
+            $totalFact = $this->parseAmount($row[17] ?? '0');
 
-            return $successCount;
+            return Contract::create([
+                'inn' => $inn,
+                'pinfl' => $pinfl,
+                'company_name' => $companyName,
+                'contract_number' => $contractNumber,
+                'additional_contract_number' => $additionalNumber,
+                'status' => $status,
+                'contract_date' => $contractDate,
+                'completion_date' => $completionDate,
+                'payment_terms' => $paymentTerms,
+                'payment_period' => $paymentPeriod,
+                'advance_percent' => $advancePercent,
+                'district' => $district,
+                'contract_amount' => $contractAmount,
+                'one_time_payment' => $oneTimePayment,
+                'monthly_payment' => $monthlyPayment,
+                'total_payment' => $totalPayment,
+                'remaining_amount' => $remainingAmount,
+                'total_fact' => $totalFact,
+                'total_plan' => 0, // Will be calculated from schedules
+            ]);
 
         } catch (Exception $e) {
-            $this->command->error('Failed to parse payment CSV: ' . $e->getMessage());
-            throw $e;
+            $this->warnings[] = "Line {$lineNumber}: Failed to create contract - " . $e->getMessage();
+            return null;
         }
     }
 
-    private function displaySummary(int $contractCount, int $paymentCount, float $duration): void
+    private function createPaymentSchedules(
+        Contract $contract,
+        array $row,
+        array $factPeriods,
+        array $planPeriods,
+        int $factStartIndex,
+        int $planStartIndex
+    ): void {
+        $totalPlan = 0;
+        $schedules = [];
+
+        // First, process PLAN columns (41-102) to establish baseline
+        foreach ($planPeriods as $index => $periodHeader) {
+            $colIndex = $planStartIndex + $index;
+            if ($colIndex >= count($row)) break;
+
+            $plannedAmount = $this->parseAmount($row[$colIndex] ?? '0');
+            if ($plannedAmount <= 0) continue;
+
+            $periodDate = $this->parsePeriodDate($periodHeader);
+            if (!$periodDate) continue;
+
+            $key = $periodDate->format('Y-m');
+            $schedules[$key] = [
+                'contract_id' => $contract->id,
+                'year' => $periodDate->year,
+                'month' => $periodDate->month,
+                'period_date' => $periodDate->format('Y-m-d'),
+                'period_label' => $periodDate->format('Y-m'),
+                'planned_amount' => $plannedAmount,
+                'actual_amount' => 0,
+                'debt_amount' => $plannedAmount,
+                'is_overdue' => $periodDate->isPast(),
+            ];
+
+            $totalPlan += $plannedAmount;
+        }
+
+        // Then, process FACT columns (18-39) and merge with plan data
+        foreach ($factPeriods as $index => $periodHeader) {
+            $colIndex = $factStartIndex + $index;
+            if ($colIndex >= count($row)) break;
+
+            $actualAmount = $this->parseAmount($row[$colIndex] ?? '0');
+            if ($actualAmount <= 0) continue;
+
+            $periodDate = $this->parsePeriodDate($periodHeader);
+            if (!$periodDate) continue;
+
+            $key = $periodDate->format('Y-m');
+
+            if (isset($schedules[$key])) {
+                // Update existing plan with actual data
+                $schedules[$key]['actual_amount'] = $actualAmount;
+                $schedules[$key]['debt_amount'] = $schedules[$key]['planned_amount'] - $actualAmount;
+            } else {
+                // Create FACT-only entry (no plan exists)
+                $schedules[$key] = [
+                    'contract_id' => $contract->id,
+                    'year' => $periodDate->year,
+                    'month' => $periodDate->month,
+                    'period_date' => $periodDate->format('Y-m-d'),
+                    'period_label' => $periodDate->format('Y-m'),
+                    'planned_amount' => 0,
+                    'actual_amount' => $actualAmount,
+                    'debt_amount' => -$actualAmount,
+                    'is_overdue' => false,
+                ];
+            }
+        }
+
+        // Bulk insert all schedules
+        foreach ($schedules as $schedule) {
+            PaymentSchedule::create($schedule);
+        }
+
+        // Update contract with total plan
+        $contract->update(['total_plan' => $totalPlan]);
+    }
+
+    private function parseAmount($str): float
+    {
+        $str = trim($str);
+
+        if (empty($str) || in_array($str, ['-', '–', '—', 'N/A', 'n/a'])) {
+            return 0;
+        }
+
+        // Replace comma with dot
+        $str = str_replace(',', '.', $str);
+
+        // Remove spaces
+        $str = str_replace([' ', '\xC2\xA0', '\s'], '', $str);
+
+        // Remove percentage signs if any
+        $str = str_replace('%', '', $str);
+
+        // Remove any remaining non-numeric characters except decimal point and minus
+        $str = preg_replace('/[^0-9.\-]/', '', $str);
+
+        try {
+            return (float)$str;
+        } catch (Exception $e) {
+            return 0;
+        }
+    }
+
+    private function parseDate($str): ?string
+    {
+        $str = trim($str);
+        if (empty($str)) return null;
+
+        try {
+            // Try DD.MM.YYYY format
+            if (preg_match('/^\d{2}\.\d{2}\.\d{4}$/', $str)) {
+                return Carbon::createFromFormat('d.m.Y', $str)->format('Y-m-d');
+            }
+            // Try YYYY-MM-DD format
+            if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $str)) {
+                return Carbon::parse($str)->format('Y-m-d');
+            }
+            return null;
+        } catch (Exception $e) {
+            return null;
+        }
+    }
+
+    private function parsePeriodDate($str): ?Carbon
+    {
+        $str = trim($str);
+        if (empty($str)) return null;
+
+        try {
+            // Try DD.MM.YY format (e.g., "30.04.24")
+            if (preg_match('/^\d{2}\.\d{2}\.\d{2}$/', $str)) {
+                return Carbon::createFromFormat('d.m.y', $str);
+            }
+            // Try DD.MM.YYYY format
+            if (preg_match('/^\d{2}\.\d{2}\.\d{4}$/', $str)) {
+                return Carbon::createFromFormat('d.m.Y', $str);
+            }
+            return null;
+        } catch (Exception $e) {
+            Log::warning("Failed to parse period date: {$str}");
+            return null;
+        }
+    }
+
+    private function parseStatus($str): string
+    {
+        $str = mb_strtolower(trim($str));
+
+        if (strpos($str, 'амал') !== false) return 'амал қилувчи';
+        if (strpos($str, 'бекор') !== false) return 'Бекор қилинган';
+        if (strpos($str, 'якун') !== false) return 'Якунланган';
+
+        return 'амал қилувчи';
+    }
+
+    private function cleanIdentifier($str): ?string
+    {
+        $str = preg_replace('/[^0-9]/', '', trim($str));
+        return empty($str) ? null : $str;
+    }
+
+    private function displaySummary(int $contractCount, float $duration): void
     {
         $this->command->newLine();
         $this->command->info('===========================================');
         $this->command->info('SEEDING COMPLETED SUCCESSFULLY!');
         $this->command->info('===========================================');
         $this->command->info("Contracts imported: {$contractCount}");
-        $this->command->info("Payments imported: {$paymentCount}");
         $this->command->info("Duration: {$duration} seconds");
 
         $scheduleCount = PaymentSchedule::count();
         $this->command->info("Payment schedules created: {$scheduleCount}");
-
-        $matchedPayments = Payment::where('is_matched', true)->count();
-        if ($paymentCount > 0) {
-            $matchRate = round(($matchedPayments / $paymentCount) * 100, 2);
-            $this->command->info("Payments matched: {$matchedPayments}/{$paymentCount} ({$matchRate}%)");
-        }
 
         if (count($this->warnings) > 0) {
             $this->command->newLine();
@@ -290,79 +396,5 @@ class ARTDataSeeder extends Seeder
         }
 
         $this->command->info('===========================================');
-    }
-
-    private function generateSchedulesForContract(Contract $contract, array $quarterlyPayments): void
-    {
-        try {
-            // Check if this is a Muddatsiz (one-time payment) contract
-            // Muddatsiz contracts have no quarterly payments (all zeros)
-            $hasQuarterlyPayments = array_sum($quarterlyPayments) > 0;
-
-            if (!$hasQuarterlyPayments) {
-                // Muddatsiz: One-time payment contract
-                // Create a single schedule entry for the initial/remaining payment
-                $plannedAmount = $contract->remaining_amount > 0 ? $contract->remaining_amount : $contract->initial_payment;
-
-                if ($plannedAmount > 0) {
-                    PaymentSchedule::create([
-                        'contract_id' => $contract->id,
-                        'year' => $contract->completion_date ? $contract->completion_date->year : Carbon::now()->year,
-                        'quarter' => $contract->completion_date ? (int)ceil($contract->completion_date->month / 3) : 1,
-                        'period' => 'Muddatsiz', // One-time payment
-                        'planned_amount' => $plannedAmount,
-                        'actual_amount' => 0,
-                        'debt_amount' => $plannedAmount,
-                        'due_date' => $contract->completion_date ?? Carbon::now(),
-                        'is_overdue' => false,
-                    ]);
-                }
-            } else {
-                // Muddatli: Scheduled payment contract
-                // Map quarters: I Q1 2024, II Q2 2024, III Q3 2024, IV Q4 2024, etc.
-                // Array indices 0-15 for 2024-2027 (4 quarters x 4 years)
-                // Extended to support up to 2030 based on CSV structure
-                $years = [2024, 2025, 2026, 2027, 2028, 2029, 2030];
-                $index = 0;
-
-                foreach ($years as $year) {
-                    for ($quarter = 1; $quarter <= 4; $quarter++) {
-                        // Check if we have data for this index
-                        if ($index >= count($quarterlyPayments)) {
-                            break 2; // Exit both loops
-                        }
-
-                        $amount = $quarterlyPayments[$index] ?? 0;
-                        $index++;
-
-                        // Skip if amount is zero or null
-                        if ($amount <= 0) continue;
-
-                        // Calculate due date (last day of quarter)
-                        $month = $quarter * 3;
-                        $dueDate = Carbon::create($year, $month, 1)->endOfMonth();
-
-                        PaymentSchedule::create([
-                            'contract_id' => $contract->id,
-                            'year' => $year,
-                            'quarter' => $quarter,
-                            'period' => "{$year} Q{$quarter}",
-                            'planned_amount' => $amount,
-                            'actual_amount' => 0,
-                            'debt_amount' => $amount,
-                            'due_date' => $dueDate,
-                            'is_overdue' => false,
-                        ]);
-                    }
-                }
-            }
-        } catch (Exception $e) {
-            $this->errors[] = "Failed to generate schedules for contract {$contract->contract_number}: " . $e->getMessage();
-            Log::error("Schedule generation failed for contract {$contract->contract_number}", [
-                'error' => $e->getMessage(),
-                'contract_id' => $contract->id
-            ]);
-            throw $e;
-        }
     }
 }

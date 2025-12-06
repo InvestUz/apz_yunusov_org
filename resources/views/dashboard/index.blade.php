@@ -121,6 +121,27 @@
                 </div>
             </div>
         </div>
+
+        <!-- Card 6: Today's Debt - Orange -->
+        <div class="col-xl-10p col-lg-4 col-md-6">
+            <div class="stats-card">
+                <div class="card-body w-100">
+                    <div class="d-flex align-items-center justify-content-between">
+                        <div class="flex-grow-1">
+                            <div class="card-title">Бугунги қарз</div>
+                            <div class="card-value text-red" title="{{ number_format($stats->todayDebt,0,'',' ') }}">{{ number_format($stats->todayDebt,0,'',' ') }}</div>
+                            <div class="card-subtitle mt-3">
+                                <i class="fas fa-calendar-day me-1"></i>
+                                {{ now()->format('d.m.Y') }} (сўм)
+                            </div>
+                        </div>
+                        <div class="icon-container" style="background: rgba(255,255,255,0.2); color: white;">
+                            <i class="fas fa-clock"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Charts Row -->
@@ -141,8 +162,8 @@
                 <div class="card-header bg-blue text-white" style="padding: 1.25rem 1.5rem;">
                     <h5 class="mb-0" style="font-size: 1.15rem;"><i class="fas fa-chart-line me-2"></i>Режа — Факт — Қарздорлик</h5>
                 </div>
-                <div class="card-body" style="padding: 1.75rem;">
-                    <canvas id="scheduleChart" height="300"></canvas>
+                <div class="card-body" style="padding: 1.75rem; height: 350px; max-height: 350px; overflow: hidden;">
+                    <canvas id="scheduleChart" style="max-height: 300px !important;"></canvas>
                 </div>
             </div>
         </div>
@@ -349,8 +370,11 @@
 
 @section('scripts')
 <script>
+// Limit data to prevent chart overflow
+const MAX_CHART_POINTS = 12;
+
 // District Chart with Blue & Red colors
-const districtData = @json($districtStats->map(function($d) {
+const districtDataRaw = @json($districtStats->map(function($d) {
     return [
         'district' => $d->districtName,
         'total_amount' => $d->totalAmount,
@@ -358,56 +382,74 @@ const districtData = @json($districtStats->map(function($d) {
     ];
 }));
 
-const districtChart = new Chart(document.getElementById('districtChart'), {
-    type: 'bar',
-    data: {
-        labels: districtData.map(d => d.district),
-        datasets: [{
-            label: 'Жами сумма (млрд)',
-            data: districtData.map(d => (d.total_amount / 1000000000).toFixed(2)),
-            backgroundColor: '#2563eb',
-        }, {
-            label: 'Тўланган (млрд)',
-            data: districtData.map(d => (d.paid_amount / 1000000000).toFixed(2)),
-            backgroundColor: '#3b82f6',
-        }]
-    },
-    options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-            legend: { position: 'top' }
+// Limit to top 12 districts to prevent overflow
+const districtData = districtDataRaw.slice(0, MAX_CHART_POINTS);
+
+if (document.getElementById('districtChart')) {
+    const districtChart = new Chart(document.getElementById('districtChart'), {
+        type: 'bar',
+        data: {
+            labels: districtData.map(d => d.district),
+            datasets: [{
+                label: 'Жами сумма (млрд)',
+                data: districtData.map(d => (d.total_amount / 1000000000).toFixed(2)),
+                backgroundColor: '#2563eb',
+            }, {
+                label: 'Тўланган (млрд)',
+                data: districtData.map(d => (d.paid_amount / 1000000000).toFixed(2)),
+                backgroundColor: '#3b82f6',
+            }]
         },
-        scales: {
-            y: { beginAtZero: true }
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { position: 'top' }
+            },
+            scales: {
+                y: { beginAtZero: true }
+            }
         }
-    }
-});
+    });
+}
 
 // Chart Data from API with Blue & Red colors
-const chartData = @json($chartData);
-const scheduleChart = new Chart(document.getElementById('scheduleChart'), {
-    type: 'line',
-    data: {
-        labels: chartData.map(d => d.label || d.period),
-        datasets: [{
-            label: 'Тўловлар (млн)',
-            data: chartData.map(d => (d.actual / 1000000).toFixed(2)),
-            borderColor: '#2563eb',
-            backgroundColor: 'rgba(37, 99, 235, 0.1)',
-            tension: 0.4
-        }]
-    },
-    options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-            legend: { position: 'top' }
+const chartDataRaw = @json($chartData);
+
+// Ensure we don't have too many data points
+const chartData = Array.isArray(chartDataRaw)
+    ? chartDataRaw.slice(-MAX_CHART_POINTS)
+    : [];
+
+if (document.getElementById('scheduleChart') && chartData.length > 0) {
+    const scheduleChart = new Chart(document.getElementById('scheduleChart'), {
+        type: 'line',
+        data: {
+            labels: chartData.map(d => d.label || d.period || 'N/A'),
+            datasets: [{
+                label: 'Тўловлар (млн)',
+                data: chartData.map(d => {
+                    const value = d.actual || 0;
+                    return (value / 1000000).toFixed(2);
+                }),
+                borderColor: '#2563eb',
+                backgroundColor: 'rgba(37, 99, 235, 0.1)',
+                tension: 0.4
+            }]
         },
-        scales: {
-            y: { beginAtZero: true }
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { position: 'top' }
+            },
+            scales: {
+                y: { beginAtZero: true }
+            }
         }
-    }
-});
+    });
+} else {
+    console.warn('Schedule chart: No data available or element not found');
+}
 </script>
 @endsection

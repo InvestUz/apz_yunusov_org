@@ -12,17 +12,17 @@ return new class extends Migration
             $table->id();
             $table->foreignId('contract_id')->constrained()->onDelete('cascade');
             $table->integer('year');
-            $table->integer('quarter')->nullable();
-            $table->string('period'); // "2024 Q1", "2025", etc.
+            $table->integer('month');
+            $table->date('period_date'); // The exact date from CSV header (e.g., 30.04.24)
+            $table->string('period_label'); // Human-readable label (e.g., "2024-04")
             $table->decimal('planned_amount', 20, 2)->default(0);
             $table->decimal('actual_amount', 20, 2)->default(0);
             $table->decimal('debt_amount', 20, 2)->default(0);
-            $table->date('due_date')->nullable();
             $table->boolean('is_overdue')->default(false);
             $table->timestamps();
-            
-            $table->index(['contract_id', 'year', 'quarter']);
-            $table->index('period');
+
+            $table->index(['contract_id', 'year', 'month']);
+            $table->index('period_date');
         });
     }
 

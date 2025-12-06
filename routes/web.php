@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\ARTDashboardController;
 use App\Http\Controllers\ContractController;
 
 use App\Models\Contract;
@@ -35,8 +36,11 @@ Route::get('/debug-core-status-contracts', function () {
 */
 
 Route::get('/', function () {
-    return redirect('/dashboard');
+    return redirect('/art/dashboard');
 });
+
+// ART Dashboard (Simple Production View)
+Route::get('/art/dashboard', [ARTDashboardController::class, 'index'])->name('art.dashboard');
 
 // ART Monitoring Dashboard Routes
 Route::prefix('dashboard')->group(function () {

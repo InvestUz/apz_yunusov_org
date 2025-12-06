@@ -11,34 +11,36 @@ class Contract extends Model
 
     protected $fillable = [
         'contract_number',
+        'additional_contract_number',
         'inn',
         'pinfl',
-        'passport',
         'company_name',
         'district',
         'status',
         'contract_date',
         'completion_date',
-        'contract_amount',
-        'initial_payment',
-        'remaining_amount',
-        'quarterly_payment',
         'payment_terms',
         'payment_period',
         'advance_percent',
-        'notes',
-        'needs_manual_resolve',
+        'contract_amount',
+        'one_time_payment',
+        'monthly_payment',
+        'total_payment',
+        'remaining_amount',
+        'total_fact',
+        'total_plan',
     ];
 
     protected $casts = [
         'contract_date' => 'date',
         'completion_date' => 'date',
         'contract_amount' => 'decimal:2',
-        'initial_payment' => 'decimal:2',
+        'one_time_payment' => 'decimal:2',
+        'monthly_payment' => 'decimal:2',
+        'total_payment' => 'decimal:2',
         'remaining_amount' => 'decimal:2',
-        'quarterly_payment' => 'decimal:2',
-        'advance_percent' => 'decimal:2',
-        'needs_manual_resolve' => 'boolean',
+        'total_fact' => 'decimal:2',
+        'total_plan' => 'decimal:2',
     ];
 
     public function payments()
@@ -69,7 +71,7 @@ class Contract extends Model
 
     public function getIdentifier()
     {
-        return $this->inn ?? $this->pinfl ?? $this->passport;
+        return $this->inn ?? $this->pinfl;
     }
 
     public function scopeActive($query)

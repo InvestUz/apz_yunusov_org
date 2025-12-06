@@ -14,8 +14,7 @@ return new class extends Migration
             $table->date('payment_date');
             $table->string('inn')->nullable();
             $table->string('pinfl')->nullable();
-            $table->string('passport')->nullable();
-            $table->decimal('amount_credit', 20, 2)->default(0); // negative if refund
+            $table->decimal('amount_credit', 20, 2)->default(0);
             $table->decimal('amount_debit', 20, 2)->default(0);
             $table->string('district')->nullable();
             $table->text('description')->nullable();
@@ -24,8 +23,8 @@ return new class extends Migration
             $table->string('month')->nullable();
             $table->boolean('is_matched')->default(false);
             $table->timestamps();
-            
-            $table->index(['inn', 'pinfl', 'passport']);
+
+            $table->index(['inn', 'pinfl']);
             $table->index('payment_date');
             $table->index('contract_id');
         });

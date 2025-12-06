@@ -12,12 +12,12 @@ class PaymentSchedule extends Model
     protected $fillable = [
         'contract_id',
         'year',
-        'quarter',
-        'period',
+        'month',
+        'period_date',
+        'period_label',
         'planned_amount',
         'actual_amount',
         'debt_amount',
-        'due_date',
         'is_overdue',
     ];
 
@@ -25,7 +25,7 @@ class PaymentSchedule extends Model
         'planned_amount' => 'decimal:2',
         'actual_amount' => 'decimal:2',
         'debt_amount' => 'decimal:2',
-        'due_date' => 'date',
+        'period_date' => 'date',
         'is_overdue' => 'boolean',
     ];
 
@@ -36,9 +36,14 @@ class PaymentSchedule extends Model
 
     public function checkOverdue()
     {
-        if ($this->due_date && $this->due_date->isPast() && $this->debt_amount > 0) {
+        if ($this->period_date && $this->period_date->isPast() && $this->debt_amount > 0) {
             $this->is_overdue = true;
             $this->save();
         }
+    }
+
+    public function getQuarter(): int
+    {
+        return (int)ceil($this->month / 3);
     }
 }

@@ -86,7 +86,6 @@ class ContractService
                         'contract_number' => $contractNumber,
                         'inn' => $this->cleanIdentifier($row[1] ?? ''),
                         'pinfl' => $this->cleanIdentifier($row[1] ?? ''),
-                        'passport' => trim($row[2] ?? ''),
                         'company_name' => $companyName,
                         'district' => trim($row[12] ?? 'Unknown'),
                         'status' => $this->parseStatus($row[6] ?? ''),
@@ -256,19 +255,19 @@ class ContractService
         }
     }
 
-    private function parseStatus($str)
+    private function parseStatus($str): string
     {
         $str = trim($str);
 
         // Convert to lowercase for case-insensitive matching
         $strLower = mb_strtolower($str);
 
-        if (strpos($strLower, 'амал') !== false) return 'Амал қилувчи';
+        if (strpos($strLower, 'амал') !== false) return 'амал қилувчи';
         if (strpos($strLower, 'бекор') !== false) return 'Бекор қилинган';
         if (strpos($strLower, 'якун') !== false) return 'Якунланган';
 
         // Default to active status
-        return 'Амал қилувчи';
+        return 'амал қилувчи';
     }
 
     private function parsePercent($str)
@@ -321,8 +320,6 @@ class ContractService
             $query->where('inn', $payment->inn);
         } elseif ($payment->pinfl) {
             $query->where('pinfl', $payment->pinfl);
-        } elseif ($payment->passport) {
-            $query->where('passport', $payment->passport);
         }
 
         return $query->get();
@@ -346,8 +343,8 @@ class ContractService
                 $score += 2;
             }
 
-            // Active status
-            if ($contract->status == 'Амал қилувчи') {
+            // Active status (use lowercase to match migration)
+            if ($contract->status == 'амал қилувчи') {
                 $score += 1;
             }
 

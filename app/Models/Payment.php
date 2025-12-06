@@ -14,7 +14,6 @@ class Payment extends Model
         'payment_date',
         'inn',
         'pinfl',
-        'passport',
         'amount_credit',
         'amount_debit',
         'district',
@@ -39,7 +38,7 @@ class Payment extends Model
 
     public function getIdentifier()
     {
-        return $this->inn ?? $this->pinfl ?? $this->passport;
+        return $this->inn ?? $this->pinfl;
     }
 
     public function getNetAmountAttribute()
